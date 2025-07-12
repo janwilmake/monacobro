@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monaco Editor with Self Types</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+
+        #container {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #ccc;
+        }
+
+        #controls {
+            margin-bottom: 10px;
+        }
+
+        button {
+            margin-right: 10px;
+            padding: 8px 16px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Monaco Editor with TypeScript Definitions</h1>
+    <div id="controls">
+        <button onclick="loadMonacoTypes()">Reload Monaco Types</button>
+        <button onclick="getEditorValue()">Get Code</button>
+    </div>
+    <div id="container"></div>
+
+    <script src="https://unpkg.com/monaco-editor@latest/min/vs/loader.js"></script>
+    <script>
+        let editor;
+
+        // Configure Monaco Environment
+        window.MonacoEnvironment = {
+            getWorkerUrl: function (moduleId, label) {
+                if (label === 'json') {
+                    return 'https://unpkg.com/monaco-editor@latest/min/vs/language/json/json.worker.js';
+                }
+                if (label === 'css' || label === 'scss' || label === 'less') {
+                    return 'https://unpkg.com/monaco-editor@latest/min/vs/language/css/css.worker.js';
+                }
+                if (label === 'html' || label === 'handlebars' || label === 'razor') {
+                    return 'https://unpkg.com/monaco-editor@latest/min/vs/language/html/html.worker.js';
+                }
+                if (label === 'typescript' || label === 'javascript') {
+                    return 'https://unpkg.com/monaco-editor@latest/min/vs/language/typescript/ts.worker.js';
+                }
+                return 'https://unpkg.com/monaco-editor@latest/min/vs/editor/editor.worker.js';
+            }
+        };
+
+        require.config({ paths: { vs: 'https://unpkg.com/monaco-editor@latest/min/vs' } });
+
+        require(['vs/editor/editor.main'], function () {
+            // Configure TypeScript compiler options
+            monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+                target: monaco.languages.typescript.ScriptTarget.ES2020,
+                allowNonTsExtensions: true,
+                moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+                module: monaco.languages.typescript.ModuleKind.CommonJS,
+                noEmit: true,
+                esModuleInterop: true,
+                jsx: monaco.languages.typescript.JsxEmit.React,
+                reactNamespace: 'React',
+                allowJs: true,
+                typeRoots: ['node_modules/@types']
+            });
+
+            monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+                target: monaco.languages.typescript.ScriptTarget.ES2020,
+                allowNonTsExtensions: true,
+                moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+                module: monaco.languages.typescript.ModuleKind.CommonJS,
+                noEmit: true,
+                esModuleInterop: true,
+                allowJs: true,
+                checkJs: false
+            });
+
+            // Create the editor
+            editor = monaco.editor.create(document.getElementById('container'), {
+                value: `// Monaco Editor with its own types!
+// Try typing 'monaco.' and see the autocomplete
+
+// Example: Create a new editor instance
+const newEditor = monaco.editor.create(document.getElementById('container'), {
+    value: 'Hello World',
+    language: 'javascript',
+    theme: 'vs-dark'
+});
+
+// Example: Get editor model
+const model = newEditor.getModel();
+if (model) {
+    console.log('Model URI:', model.uri.toString());
+}
+
+// Example: Set editor value
+newEditor.setValue('New content');
+
+// Example: Add action
+newEditor.addAction({
+    id: 'my-unique-id',
+    label: 'My Label',
+    keybindings: [
+        monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF
+    ],
+    run: function(ed) {
+        alert('Action executed!');
+        return null;
+    }
+});
+
+// Example: Language features
+monaco.languages.registerCompletionItemProvider('javascript', {
+    provideCompletionItems: function(model, position) {
+        return {
+            suggestions: [{
+                label: 'myCustomFunction',
+                kind: monaco.languages.CompletionItemKind.Function,
+                insertText: 'myCustomFunction()',
+                detail: 'Custom function'
+            }]
+        };
+    }
+});`,
+                language: 'typescript',
+                theme: 'vs-dark',
+                automaticLayout: true,
+                minimap: { enabled: false }
+            });
+
+            // Load Monaco types immediately
+            loadMonacoTypes();
+        });
+
+        async function loadMonacoTypes() {
+            try {
+                // Create comprehensive Monaco type definitions
+                const monacoTypes = `
+declare namespace monaco {
+    export namespace editor {
+        export function create(domElement: HTMLElement, options?: IStandaloneEditorConstructionOptions): IStandaloneCodeEditor;
+        export function createModel(value: string, language?: string, uri?: Uri): ITextModel;
+        export function getModels(): ITextModel[];
+        export function setModelLanguage(model: ITextModel, languageId: string): void;
+        export function createDiffEditor(domElement: HTMLElement, options?: IStandaloneDiffEditorConstructionOptions): IStandaloneDiffEditor;
+        
+        export interface IStandaloneCodeEditor {
+            getValue(): string;
+            setValue(newValue: string): void;
+            getModel(): ITextModel | null;
+            setModel(model: ITextModel | null): void;
+            addAction(descriptor: IActionDescriptor): IDisposable;
+            trigger(source: string, handlerId: string, payload?: any): void;
+            getPosition(): Position | null;
+            setPosition(position: IPosition): void;
+            revealLine(lineNumber: number): void;
+            focus(): void;
+            dispose(): void;
+        }
+        
+        export interface ITextModel {
+            uri: Uri;
+            getValue(): string;
+            setValue(newValue: string): void;
+            getLanguageId(): string;
+            dispose(): void;
+        }
+        
+        export interface IActionDescriptor {
+            id: string;
+            label: string;
+            keybindings?: number[];
+            contextMenuGroupId?: string;
+            contextMenuOrder?: number;
+            run(editor: IStandaloneCodeEditor): void | Promise<void>;
+        }
+        
+        export interface IStandaloneEditorConstructionOptions {
+            value?: string;
+            language?: string;
+            theme?: string;
+            automaticLayout?: boolean;
+            minimap?: { enabled: boolean };
+            readOnly?: boolean;
+            fontSize?: number;
+            lineNumbers?: 'on' | 'off' | 'relative' | 'interval';
+        }
+        
+        export interface IStandaloneDiffEditorConstructionOptions {
+            theme?: string;
+            automaticLayout?: boolean;
+            readOnly?: boolean;
+        }
+        
+        export interface IStandaloneDiffEditor {
+            getOriginalEditor(): IStandaloneCodeEditor;
+            getModifiedEditor(): IStandaloneCodeEditor;
+            dispose(): void;
+        }
+        
+        export class Position {
+            constructor(lineNumber: number, column: number);
+            lineNumber: number;
+            column: number;
+        }
+        
+        export interface IPosition {
+            lineNumber: number;
+            column: number;
+        }
+    }
+    
+    export namespace languages {
+        export function registerCompletionItemProvider(languageId: string, provider: CompletionItemProvider): IDisposable;
+        export function registerHoverProvider(languageId: string, provider: HoverProvider): IDisposable;
+        
+        export interface CompletionItemProvider {
+            provideCompletionItems(model: editor.ITextModel, position: Position): CompletionList | Promise<CompletionList>;
+        }
+        
+        export interface HoverProvider {
+            provideHover(model: editor.ITextModel, position: Position): Hover | Promise<Hover>;
+        }
+        
+        export interface CompletionList {
+            suggestions: CompletionItem[];
+        }
+        
+        export interface CompletionItem {
+            label: string;
+            kind: CompletionItemKind;
+            insertText: string;
+            detail?: string;
+            documentation?: string;
+        }
+        
+        export enum CompletionItemKind {
+            Method = 0,
+            Function = 1,
+            Constructor = 2,
+            Field = 3,
+            Variable = 4,
+            Class = 5,
+            Struct = 6,
+            Interface = 7,
+            Module = 8,
+            Property = 9,
+            Event = 10,
+            Operator = 11,
+            Unit = 12,
+            Value = 13,
+            Constant = 14,
+            Enum = 15,
+            EnumMember = 16,
+            Keyword = 17,
+            Text = 18,
+            Color = 19,
+            File = 20,
+            Reference = 21,
+            Customcolor = 22,
+            Folder = 23,
+            TypeParameter = 24,
+            Snippet = 25
+        }
+        
+        export interface Hover {
+            contents: string[];
+        }
+        
+        export namespace typescript {
+            export const typescriptDefaults: {
+                addExtraLib(content: string, filePath?: string): IDisposable;
+                setCompilerOptions(options: any): void;
+            };
+            export const javascriptDefaults: {
+                addExtraLib(content: string, filePath?: string): IDisposable;
+                setCompilerOptions(options: any): void;
+            };
+            export enum ScriptTarget {
+                ES3 = 0,
+                ES5 = 1,
+                ES2015 = 2,
+                ES2016 = 3,
+                ES2017 = 4,
+                ES2018 = 5,
+                ES2019 = 6,
+                ES2020 = 7,
+                ESNext = 99
+            }
+            export enum ModuleKind {
+                None = 0,
+                CommonJS = 1,
+                AMD = 2,
+                UMD = 3,
+                System = 4,
+                ES2015 = 5,
+                ES2020 = 6,
+                ESNext = 99
+            }
+            export enum ModuleResolutionKind {
+                Classic = 1,
+                NodeJs = 2
+            }
+            export enum JsxEmit {
+                None = 0,
+                Preserve = 1,
+                React = 2,
+                ReactNative = 3
+            }
+        }
+    }
+    
+    export const KeyMod: {
+        CtrlCmd: number;
+        Shift: number;
+        Alt: number;
+        WinCtrl: number;
+    };
+    
+    export const KeyCode: {
+        KeyA: number;
+        KeyB: number;
+        KeyC: number;
+        KeyD: number;
+        KeyE: number;
+        KeyF: number;
+        KeyG: number;
+        KeyH: number;
+        KeyI: number;
+        KeyJ: number;
+        KeyK: number;
+        KeyL: number;
+        KeyM: number;
+        KeyN: number;
+        KeyO: number;
+        KeyP: number;
+        KeyQ: number;
+        KeyR: number;
+        KeyS: number;
+        KeyT: number;
+        KeyU: number;
+        KeyV: number;
+        KeyW: number;
+        KeyX: number;
+        KeyY: number;
+        KeyZ: number;
+        F1: number;
+        F2: number;
+        F3: number;
+        F4: number;
+        F5: number;
+        F6: number;
+        F7: number;
+        F8: number;
+        F9: number;
+        F10: number;
+        F11: number;
+        F12: number;
+        Enter: number;
+        Escape: number;
+        Space: number;
+        Tab: number;
+        Backspace: number;
+        Delete: number;
+        ArrowLeft: number;
+        ArrowUp: number;
+        ArrowRight: number;
+        ArrowDown: number;
+    };
+    
+    export class Uri {
+        static file(path: string): Uri;
+        static parse(value: string): Uri;
+        toString(): string;
+    }
+    
+    export interface IDisposable {
+        dispose(): void;
+    }
+}
+
+declare const monaco: typeof monaco;
+`;
+
+                // Add the comprehensive Monaco types
+                monaco.languages.typescript.typescriptDefaults.addExtraLib(
+                    monacoTypes,
+                    'file:///node_modules/@types/monaco-editor/index.d.ts'
+                );
+
+                monaco.languages.typescript.javascriptDefaults.addExtraLib(
+                    monacoTypes,
+                    'file:///node_modules/@types/monaco-editor/index.d.ts'
+                );
+
+                console.log('Monaco types loaded successfully!');
+
+                // Force refresh of the current model
+                if (editor) {
+                    const model = editor.getModel();
+                    if (model) {
+                        monaco.editor.setModelLanguage(model, model.getLanguageId());
+                    }
+                }
+
+            } catch (error) {
+                console.error('Failed to load Monaco types:', error);
+            }
+        }
+
+        function getEditorValue() {
+            if (editor) {
+                console.log('Editor content:', editor.getValue());
+                alert('Check console for editor content');
+            }
+        }
+    </script>
+</body>
+
+</html>

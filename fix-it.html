@@ -1,0 +1,459 @@
+<!-- 
+ 
+in Monaco JS how would it be possible to make some sort of 'fix it' warning that you can click to open a modal to fix something? show me this complete working example in a html codeblock
+
+
+This example demonstrates:
+
+1. **Custom Markers**: Creates warning markers for common issues like unused variables, missing semicolons, and var usage
+2. **Code Actions**: Registers a code action provider that shows lightbulb icons next to warnings
+3. **Clickable Fixes**: When you click the lightbulb, it opens a modal with multiple fix options
+4. **Modal Interface**: A clean modal popup showing different ways to fix the issue
+5. **Automatic Fixes**: Each fix option automatically applies the changes to the editor
+6. **Real-time Updates**: Markers update as you type
+
+**How to use:**
+1. Type or modify the sample code
+2. Look for lightbulb icons 💡 next to warnings
+3. Click the lightbulb to see quick fix options
+4. Or right-click and select "Quick Fix" from the context menu
+5. Choose a fix from the modal popup
+
+The example includes fixes for:
+- Removing unused variables
+- Adding variable usage
+- Adding missing semicolons  
+- Converting `var` to `let` or `const`
+
+You can extend this pattern to add more sophisticated code analysis and fixes for your specific use case.
+
+-->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monaco Editor with Fix-it Warnings</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        #container {
+            width: 100%;
+            height: 500px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            border-radius: 8px;
+            width: 400px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .modal-title {
+            margin: 0;
+            color: #333;
+        }
+
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #000;
+        }
+
+        .fix-option {
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            background-color: #f9f9f9;
+            transition: background-color 0.2s;
+        }
+
+        .fix-option:hover {
+            background-color: #e9e9e9;
+        }
+
+        .fix-option-title {
+            font-weight: bold;
+            color: #0066cc;
+        }
+
+        .fix-option-description {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #e8f4f8;
+            border-left: 4px solid #0066cc;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Monaco Editor with Fix-it Warnings</h1>
+    <p>Try typing code with issues like:</p>
+    <ul>
+        <li><code>var unusedVariable = 42;</code></li>
+        <li><code>console.log("missing semicolon")</code></li>
+        <li><code>let oldVarStyle = true;</code></li>
+    </ul>
+
+    <div id="container"></div>
+    <div id="status" class="status">Click on warning lightbulbs to see fix options!</div>
+
+    <!-- Modal -->
+    <div id="fixModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Fix Code Issue</h3>
+                <span class="close">&times;</span>
+            </div>
+            <div id="fixOptions"></div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/monaco-editor@latest/min/vs/loader.js"></script>
+    <script>
+        require.config({ paths: { 'vs': 'https://unpkg.com/monaco-editor@latest/min/vs' } });
+
+        let editor;
+        let currentMarkers = [];
+
+        require(['vs/editor/editor.main'], function () {
+            // Initial code with some issues
+            const initialCode = `// Try the following examples:
+var unusedVariable = 42;
+console.log("Hello World")
+let oldVarStyle = true;
+const anotherUnused = "test";
+
+function myFunction() {
+    var localVar = 10;
+    console.log("Function called")
+}`;
+
+            editor = monaco.editor.create(document.getElementById('container'), {
+                value: initialCode,
+                language: 'javascript',
+                theme: 'vs-dark',
+                minimap: { enabled: false },
+                lightbulb: { enabled: true }
+            });
+
+            // Register a code action provider for quick fixes
+            monaco.languages.registerCodeActionProvider('javascript', {
+                provideCodeActions: function (model, range, context, token) {
+                    const actions = [];
+
+                    // Check for markers in the current range
+                    const markers = monaco.editor.getModelMarkers({
+                        resource: model.uri
+                    }).filter(marker =>
+                        marker.startLineNumber <= range.endLineNumber &&
+                        marker.endLineNumber >= range.startLineNumber
+                    );
+
+                    markers.forEach(marker => {
+                        if (marker.message.includes('unused')) {
+                            actions.push({
+                                title: '🔧 Fix unused variable',
+                                kind: 'quickfix',
+                                edit: null, // We'll handle this in the command
+                                command: {
+                                    id: 'fix-unused-variable',
+                                    title: 'Fix unused variable',
+                                    arguments: [marker, model]
+                                }
+                            });
+                        }
+
+                        if (marker.message.includes('semicolon')) {
+                            actions.push({
+                                title: '🔧 Add missing semicolon',
+                                kind: 'quickfix',
+                                edit: null,
+                                command: {
+                                    id: 'fix-semicolon',
+                                    title: 'Add semicolon',
+                                    arguments: [marker, model]
+                                }
+                            });
+                        }
+
+                        if (marker.message.includes('var')) {
+                            actions.push({
+                                title: '🔧 Convert var to let/const',
+                                kind: 'quickfix',
+                                edit: null,
+                                command: {
+                                    id: 'fix-var-declaration',
+                                    title: 'Convert var',
+                                    arguments: [marker, model]
+                                }
+                            });
+                        }
+                    });
+
+                    return {
+                        actions: actions,
+                        dispose: function () { }
+                    };
+                }
+            });
+
+            // Register command handlers
+            editor.addCommand(monaco.KeyCode.F1, function () {
+                showFixModal('fix-unused-variable', null, null);
+            });
+
+            // Register custom commands
+            monaco.editor.registerCommand('fix-unused-variable', function (accessor, marker, model) {
+                showFixModal('fix-unused-variable', marker, model);
+            });
+
+            monaco.editor.registerCommand('fix-semicolon', function (accessor, marker, model) {
+                showFixModal('fix-semicolon', marker, model);
+            });
+
+            monaco.editor.registerCommand('fix-var-declaration', function (accessor, marker, model) {
+                showFixModal('fix-var-declaration', marker, model);
+            });
+
+            // Add some sample markers/diagnostics
+            function updateMarkers() {
+                const model = editor.getModel();
+                const code = model.getValue();
+                const lines = code.split('\n');
+                const markers = [];
+
+                lines.forEach((line, index) => {
+                    const lineNumber = index + 1;
+
+                    // Check for unused variables
+                    if (line.includes('unusedVariable') || line.includes('anotherUnused') || line.includes('localVar')) {
+                        markers.push({
+                            startLineNumber: lineNumber,
+                            startColumn: 1,
+                            endLineNumber: lineNumber,
+                            endColumn: line.length + 1,
+                            message: 'Variable is declared but never used',
+                            severity: monaco.MarkerSeverity.Warning,
+                            code: 'unused-variable'
+                        });
+                    }
+
+                    // Check for missing semicolons
+                    if (line.includes('console.log') && !line.trim().endsWith(';') && !line.trim().endsWith('{')) {
+                        markers.push({
+                            startLineNumber: lineNumber,
+                            startColumn: line.length,
+                            endLineNumber: lineNumber,
+                            endColumn: line.length + 1,
+                            message: 'Missing semicolon',
+                            severity: monaco.MarkerSeverity.Warning,
+                            code: 'missing-semicolon'
+                        });
+                    }
+
+                    // Check for var usage
+                    if (line.trim().startsWith('var ')) {
+                        markers.push({
+                            startLineNumber: lineNumber,
+                            startColumn: line.indexOf('var') + 1,
+                            endLineNumber: lineNumber,
+                            endColumn: line.indexOf('var') + 4,
+                            message: 'Use let or const instead of var',
+                            severity: monaco.MarkerSeverity.Info,
+                            code: 'var-usage'
+                        });
+                    }
+                });
+
+                monaco.editor.setModelMarkers(model, 'custom', markers);
+                currentMarkers = markers;
+            }
+
+            // Update markers on content change
+            editor.onDidChangeModelContent(() => {
+                setTimeout(updateMarkers, 500);
+            });
+
+            // Initial marker update
+            updateMarkers();
+        });
+
+        // Modal functionality
+        const modal = document.getElementById('fixModal');
+        const closeBtn = document.querySelector('.close');
+        const fixOptionsContainer = document.getElementById('fixOptions');
+        const statusDiv = document.getElementById('status');
+
+        function showFixModal(fixType, marker, model) {
+            const options = getFixOptions(fixType, marker, model);
+
+            fixOptionsContainer.innerHTML = '';
+            options.forEach(option => {
+                const optionDiv = document.createElement('div');
+                optionDiv.className = 'fix-option';
+                optionDiv.innerHTML = `
+                    <div class="fix-option-title">${option.title}</div>
+                    <div class="fix-option-description">${option.description}</div>
+                `;
+                optionDiv.onclick = () => {
+                    option.action();
+                    modal.style.display = 'none';
+                    statusDiv.innerHTML = `Applied fix: ${option.title}`;
+                };
+                fixOptionsContainer.appendChild(optionDiv);
+            });
+
+            modal.style.display = 'block';
+        }
+
+        function getFixOptions(fixType, marker, model) {
+            switch (fixType) {
+                case 'fix-unused-variable':
+                    return [
+                        {
+                            title: 'Remove unused variable',
+                            description: 'Delete the variable declaration since it\'s not being used',
+                            action: () => {
+                                if (marker && model) {
+                                    const line = model.getLineContent(marker.startLineNumber);
+                                    const edit = {
+                                        range: new monaco.Range(marker.startLineNumber, 1, marker.startLineNumber + 1, 1),
+                                        text: ''
+                                    };
+                                    editor.executeEdits('remove-unused-variable', [edit]);
+                                }
+                            }
+                        },
+                        {
+                            title: 'Add usage example',
+                            description: 'Add a console.log statement to use the variable',
+                            action: () => {
+                                if (marker && model) {
+                                    const line = model.getLineContent(marker.startLineNumber);
+                                    const varMatch = line.match(/(?:var|let|const)\s+(\w+)/);
+                                    if (varMatch) {
+                                        const varName = varMatch[1];
+                                        const edit = {
+                                            range: new monaco.Range(marker.startLineNumber + 1, 1, marker.startLineNumber + 1, 1),
+                                            text: `console.log(${varName});\n`
+                                        };
+                                        editor.executeEdits('add-variable-usage', [edit]);
+                                    }
+                                }
+                            }
+                        }
+                    ];
+
+                case 'fix-semicolon':
+                    return [
+                        {
+                            title: 'Add semicolon',
+                            description: 'Add a semicolon at the end of the line',
+                            action: () => {
+                                if (marker && model) {
+                                    const edit = {
+                                        range: new monaco.Range(marker.startLineNumber, marker.startColumn, marker.startLineNumber, marker.startColumn),
+                                        text: ';'
+                                    };
+                                    editor.executeEdits('add-semicolon', [edit]);
+                                }
+                            }
+                        }
+                    ];
+
+                case 'fix-var-declaration':
+                    return [
+                        {
+                            title: 'Convert to let',
+                            description: 'Replace var with let for block-scoped variable',
+                            action: () => {
+                                if (marker && model) {
+                                    const edit = {
+                                        range: new monaco.Range(marker.startLineNumber, marker.startColumn, marker.endLineNumber, marker.endColumn),
+                                        text: 'let'
+                                    };
+                                    editor.executeEdits('convert-to-let', [edit]);
+                                }
+                            }
+                        },
+                        {
+                            title: 'Convert to const',
+                            description: 'Replace var with const for immutable variable',
+                            action: () => {
+                                if (marker && model) {
+                                    const edit = {
+                                        range: new monaco.Range(marker.startLineNumber, marker.startColumn, marker.endLineNumber, marker.endColumn),
+                                        text: 'const'
+                                    };
+                                    editor.executeEdits('convert-to-const', [edit]);
+                                }
+                            }
+                        }
+                    ];
+
+                default:
+                    return [];
+            }
+        }
+
+        // Close modal when clicking the X or outside the modal
+        closeBtn.onclick = () => {
+            modal.style.display = 'none';
+        };
+
+        window.onclick = (event) => {
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        };
+    </script>
+</body>
+
+</html>

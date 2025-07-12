@@ -1,0 +1,11 @@
+{
+  "$schema": "https://unpkg.com/wrangler@latest/config-schema.json",
+  "name": "monacobro",
+  "compatibility_date": "2025-06-29",
+  "dev": { "port": 3000 },
+  "assets": { "directory": "./" },
+  "routes": [
+    { "custom_domain": true, "pattern": "monacobro.com" },
+    { "custom_domain": true, "pattern": "www.monacobro.com" }
+  ]
+}

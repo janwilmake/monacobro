@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monaco Editor Streaming Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        #container {
+            width: 100%;
+            height: 400px;
+            border: 1px solid #ccc;
+        }
+
+        .controls {
+            margin: 10px 0;
+        }
+
+        button {
+            margin-right: 10px;
+            padding: 8px 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Monaco Editor Streaming Demo</h1>
+
+    <div class="controls">
+        <button onclick="startStreaming()">Start Streaming</button>
+        <button onclick="stopStreaming()">Stop Streaming</button>
+        <button onclick="clearEditor()">Clear Editor</button>
+    </div>
+
+    <div id="container"></div>
+
+    <script src="https://unpkg.com/monaco-editor@0.44.0/min/vs/loader.js"></script>
+    <script>
+        let editor;
+        let streamingInterval;
+        let isStreaming = false;
+
+        // Initialize Monaco Editor
+        require.config({ paths: { vs: 'https://unpkg.com/monaco-editor@0.44.0/min/vs' } });
+        require(['vs/editor/editor.main'], function () {
+            editor = monaco.editor.create(document.getElementById('container'), {
+                value: '// Streaming content will appear here...\n',
+                language: 'javascript',
+                theme: 'vs-dark',
+                automaticLayout: true,
+                wordWrap: 'on'
+            });
+        });
+
+        // Dummy generator function that yields text chunks
+        function* textGenerator() {
+            const codeSnippets = [
+                "// Starting to generate code...\n",
+                "function fibonacci(n) {\n",
+                "    if (n <= 1) {\n",
+                "        return n;\n",
+                "    }\n",
+                "    return fibonacci(n - 1) + fibonacci(n - 2);\n",
+                "}\n\n",
+                "// Generate fibonacci sequence\n",
+                "const sequence = [];\n",
+                "for (let i = 0; i < 10; i++) {\n",
+                "    sequence.push(fibonacci(i));\n",
+                "}\n\n",
+                "console.log('Fibonacci sequence:', sequence);\n\n",
+                "// Another example function\n",
+                "function isPrime(num) {\n",
+                "    if (num < 2) return false;\n",
+                "    for (let i = 2; i <= Math.sqrt(num); i++) {\n",
+                "        if (num % i === 0) return false;\n",
+                "    }\n",
+                "    return true;\n",
+                "}\n\n",
+                "// Find prime numbers\n",
+                "const primes = [];\n",
+                "for (let i = 2; i < 50; i++) {\n",
+                "    if (isPrime(i)) {\n",
+                "        primes.push(i);\n",
+                "    }\n",
+                "}\n\n",
+                "console.log('Prime numbers:', primes);\n",
+                "// Streaming complete!\n"
+            ];
+
+            for (const snippet of codeSnippets) {
+                yield snippet;
+            }
+        }
+
+        // Stream content into Monaco editor
+        async function streamToEditor(generator) {
+            const model = editor.getModel();
+
+            for (const chunk of generator) {
+                if (!isStreaming) break; // Allow stopping mid-stream
+
+                // Get current content and append new chunk
+                const currentContent = model.getValue();
+                const newContent = currentContent + chunk;
+
+                // Update editor content
+                model.setValue(newContent);
+
+                // Scroll to bottom to show new content
+                const lineCount = model.getLineCount();
+                editor.revealLine(lineCount);
+
+                // Wait a bit to simulate streaming delay
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+
+            isStreaming = false;
+        }
+
+        // Alternative approach: Using edit operations (more efficient for large texts)
+        async function streamToEditorWithEdits(generator) {
+            const model = editor.getModel();
+
+            for (const chunk of generator) {
+                if (!isStreaming) break;
+
+                // Get the end position of current content
+                const lineCount = model.getLineCount();
+                const lastLineLength = model.getLineContent(lineCount).length;
+                const endPosition = { lineNumber: lineCount, column: lastLineLength + 1 };
+
+                // Apply edit operation to append text
+                model.applyEdits([{
+                    range: {
+                        startLineNumber: endPosition.lineNumber,
+                        startColumn: endPosition.column,
+                        endLineNumber: endPosition.lineNumber,
+                        endColumn: endPosition.column
+                    },
+                    text: chunk
+                }]);
+
+                // Scroll to show new content
+                const newLineCount = model.getLineCount();
+                editor.revealLine(newLineCount);
+
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+
+            isStreaming = false;
+        }
+
+        // Control functions
+        function startStreaming() {
+            if (isStreaming) return;
+
+            isStreaming = true;
+            const generator = textGenerator();
+
+            // Clear editor first
+            editor.getModel().setValue('');
+
+            // Start streaming (using the edit operations approach for better performance)
+            streamToEditorWithEdits(generator);
+        }
+
+        function stopStreaming() {
+            isStreaming = false;
+        }
+
+        function clearEditor() {
+            if (editor) {
+                editor.getModel().setValue('');
+            }
+        }
+
+        // Example of streaming from an async source (like an API)
+        async function* asyncTextGenerator() {
+            const responses = [
+                "// Fetching data from API...\n",
+                "const apiData = {\n",
+                "    users: [\n",
+                "        { id: 1, name: 'John Doe' },\n",
+                "        { id: 2, name: 'Jane Smith' }\n",
+                "    ]\n",
+                "};\n\n",
+                "// Processing API response...\n",
+                "console.log('Received data:', apiData);\n"
+            ];
+
+            for (const response of responses) {
+                // Simulate API delay
+                await new Promise(resolve => setTimeout(resolve, 500));
+                yield response;
+            }
+        }
+
+        // You can also stream from async sources
+        async function startAsyncStreaming() {
+            if (isStreaming) return;
+
+            isStreaming = true;
+            editor.getModel().setValue('');
+
+            const generator = asyncTextGenerator();
+
+            for await (const chunk of generator) {
+                if (!isStreaming) break;
+
+                const model = editor.getModel();
+                const currentContent = model.getValue();
+                model.setValue(currentContent + chunk);
+
+                const lineCount = model.getLineCount();
+                editor.revealLine(lineCount);
+            }
+
+            isStreaming = false;
+        }
+    </script>
+</body>
+
+</html>

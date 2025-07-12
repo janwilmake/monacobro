@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monaco Editor - VSCode Style</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1e1e1e;
+            color: #cccccc;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .editor-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .tab-bar {
+            background-color: #2d2d30;
+            border-bottom: 1px solid #3c3c3c;
+            display: flex;
+            align-items: center;
+            min-height: 35px;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+
+        .tab-bar::-webkit-scrollbar {
+            height: 3px;
+        }
+
+        .tab-bar::-webkit-scrollbar-track {
+            background: #2d2d30;
+        }
+
+        .tab-bar::-webkit-scrollbar-thumb {
+            background: #454545;
+        }
+
+        .tab {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            background-color: #2d2d30;
+            border-right: 1px solid #3c3c3c;
+            cursor: pointer;
+            min-width: 120px;
+            max-width: 200px;
+            position: relative;
+            white-space: nowrap;
+            font-size: 13px;
+            transition: background-color 0.2s;
+        }
+
+        .tab:hover {
+            background-color: #37373d;
+        }
+
+        .tab.active {
+            background-color: #1e1e1e;
+            border-bottom: 2px solid #007acc;
+        }
+
+        .tab.pinned {
+            min-width: 100px;
+        }
+
+        .tab.pinned .tab-name {
+            font-weight: 500;
+        }
+
+        .tab-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-right: 8px;
+        }
+
+        .tab-actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .pin-btn,
+        .close-btn {
+            width: 16px;
+            height: 16px;
+            border: none;
+            background: none;
+            color: #cccccc;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 2px;
+            font-size: 12px;
+            opacity: 0.7;
+            transition: opacity 0.2s, background-color 0.2s;
+        }
+
+        .pin-btn:hover,
+        .close-btn:hover {
+            opacity: 1;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .tab:not(:hover) .pin-btn:not(.pinned) {
+            opacity: 0;
+        }
+
+        .tab:not(:hover) .close-btn {
+            opacity: 0;
+        }
+
+        .tab.pinned .pin-btn {
+            opacity: 1;
+            color: #007acc;
+        }
+
+        .close-btn:hover {
+            background-color: #e81123;
+            color: white;
+        }
+
+        .editor-content {
+            flex: 1;
+            position: relative;
+        }
+
+        .file-content {
+            display: none;
+            height: 100%;
+        }
+
+        .file-content.active {
+            display: block;
+        }
+
+        #monaco-editor {
+            height: 100%;
+            width: 100%;
+        }
+
+        .file-icon {
+            width: 16px;
+            height: 16px;
+            margin-right: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            border-radius: 2px;
+        }
+
+        .file-icon.js {
+            background-color: #f7df1e;
+            color: #000;
+        }
+
+        .file-icon.html {
+            background-color: #e34c26;
+            color: #fff;
+        }
+
+        .file-icon.css {
+            background-color: #1572b6;
+            color: #fff;
+        }
+
+        .file-icon.json {
+            background-color: #cbcb41;
+            color: #000;
+        }
+
+        .file-icon.md {
+            background-color: #083fa1;
+            color: #fff;
+        }
+
+        .empty-editor {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #6a6a6a;
+            font-size: 18px;
+        }
+
+        /* Scrollbar for tabs */
+        .tab-bar {
+            scrollbar-width: thin;
+            scrollbar-color: #454545 #2d2d30;
+        }
+    </style>
+    <script src="https://unpkg.com/monaco-editor@0.44.0/min/vs/loader.js"></script>
+</head>
+
+<body>
+    <div class="editor-container">
+        <div class="tab-bar" id="tabBar">
+            <!-- Tabs will be dynamically generated -->
+        </div>
+        <div class="editor-content" id="editorContent">
+            <div id="monaco-editor"></div>
+            <div class="empty-editor" id="emptyEditor" style="display: none;">
+                Select a file to start editing
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class TabManager {
+            constructor() {
+                this.files = [
+                    {
+                        id: 'file1',
+                        name: 'index.html',
+                        type: 'html',
+                        content: '<!DOCTYPE html>\n<html lang="en">\n<head>\n    <meta charset="UTF-8">\n    <title>Hello World</title>\n</head>\n<body>\n    <h1>Hello, World!</h1>\n</body>\n</html>',
+                        pinned: true,
+                        language: 'html'
+                    },
+                    {
+                        id: 'file2',
+                        name: 'script.js',
+                        type: 'js',
+                        content: 'console.log("Hello, World!");\n\nfunction greet(name) {\n    return `Hello, ${name}!`;\n}\n\nconst message = greet("Monaco Editor");\nconsole.log(message);',
+                        pinned: true,
+                        language: 'javascript'
+                    },
+                    {
+                        id: 'file3',
+                        name: 'styles.css',
+                        type: 'css',
+                        content: 'body {\n    font-family: Arial, sans-serif;\n    margin: 0;\n    padding: 20px;\n    background-color: #f5f5f5;\n}\n\nh1 {\n    color: #333;\n    text-align: center;\n}',
+                        pinned: false,
+                        language: 'css'
+                    },
+                    {
+                        id: 'file4',
+                        name: 'package.json',
+                        type: 'json',
+                        content: '{\n  "name": "my-project",\n  "version": "1.0.0",\n  "description": "A sample project",\n  "main": "index.js",\n  "scripts": {\n    "start": "node index.js"\n  },\n  "dependencies": {\n    "express": "^4.18.0"\n  }\n}',
+                        pinned: false,
+                        language: 'json'
+                    },
+                    {
+                        id: 'file5',
+                        name: 'README.md',
+                        type: 'md',
+                        content: '# My Project\n\nThis is a sample project using Monaco Editor.\n\n## Features\n\n- Syntax highlighting\n- Code completion\n- File management\n- Tab system\n\n## Usage\n\n1. Open files using the tab system\n2. Edit code with full Monaco Editor features\n3. Pin important files to keep them open\n\n**Enjoy coding!**',
+                        pinned: false,
+                        language: 'markdown'
+                    }
+                ];
+
+                this.activeFileId = 'file1';
+                this.monacoEditor = null;
+                this.tabBar = document.getElementById('tabBar');
+                this.editorContent = document.getElementById('editorContent');
+
+                this.initMonaco();
+                this.renderTabs();
+            }
+
+            initMonaco() {
+                require.config({ paths: { vs: 'https://unpkg.com/monaco-editor@0.44.0/min/vs' } });
+                require(['vs/editor/editor.main'], () => {
+                    this.monacoEditor = monaco.editor.create(document.getElementById('monaco-editor'), {
+                        value: this.getActiveFile().content,
+                        language: this.getActiveFile().language,
+                        theme: 'vs-dark',
+                        fontSize: 14,
+                        automaticLayout: true,
+                        minimap: { enabled: true },
+                        scrollBeyondLastLine: false,
+                        wordWrap: 'on'
+                    });
+
+                    // Save content when editor changes
+                    this.monacoEditor.onDidChangeModelContent(() => {
+                        const activeFile = this.getActiveFile();
+                        if (activeFile) {
+                            activeFile.content = this.monacoEditor.getValue();
+                        }
+                    });
+                });
+            }
+
+            getActiveFile() {
+                return this.files.find(file => file.id === this.activeFileId);
+            }
+
+            renderTabs() {
+                this.tabBar.innerHTML = '';
+
+                // Sort files: pinned files first
+                const sortedFiles = [...this.files].sort((a, b) => {
+                    if (a.pinned && !b.pinned) return -1;
+                    if (!a.pinned && b.pinned) return 1;
+                    return 0;
+                });
+
+                sortedFiles.forEach(file => {
+                    const tab = this.createTab(file);
+                    this.tabBar.appendChild(tab);
+                });
+            }
+
+            createTab(file) {
+                const tab = document.createElement('div');
+                tab.className = `tab ${file.id === this.activeFileId ? 'active' : ''} ${file.pinned ? 'pinned' : ''}`;
+                tab.dataset.fileId = file.id;
+
+                tab.innerHTML = `
+                    <div class="file-icon ${file.type}">${file.type.toUpperCase()}</div>
+                    <div class="tab-name">${file.name}</div>
+                    <div class="tab-actions">
+                        <button class="pin-btn ${file.pinned ? 'pinned' : ''}" title="${file.pinned ? 'Unpin' : 'Pin'}">${file.pinned ? '●' : '○'}</button>
+                        <button class="close-btn" title="Close">×</button>
+                    </div>
+                `;
+
+                // Tab click to switch file
+                tab.addEventListener('click', (e) => {
+                    if (!e.target.classList.contains('pin-btn') && !e.target.classList.contains('close-btn')) {
+                        this.switchToFile(file.id);
+                    }
+                });
+
+                // Pin/unpin functionality
+                const pinBtn = tab.querySelector('.pin-btn');
+                pinBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.togglePin(file.id);
+                });
+
+                // Close functionality
+                const closeBtn = tab.querySelector('.close-btn');
+                closeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.closeFile(file.id);
+                });
+
+                return tab;
+            }
+
+            switchToFile(fileId) {
+                // Save current file content
+                if (this.monacoEditor && this.activeFileId) {
+                    const currentFile = this.getActiveFile();
+                    if (currentFile) {
+                        currentFile.content = this.monacoEditor.getValue();
+                    }
+                }
+
+                this.activeFileId = fileId;
+                const newFile = this.getActiveFile();
+
+                if (this.monacoEditor && newFile) {
+                    // Update editor content and language
+                    this.monacoEditor.setValue(newFile.content);
+                    monaco.editor.setModelLanguage(this.monacoEditor.getModel(), newFile.language);
+                }
+
+                this.renderTabs();
+            }
+
+            togglePin(fileId) {
+                const file = this.files.find(f => f.id === fileId);
+                if (file) {
+                    file.pinned = !file.pinned;
+                    this.renderTabs();
+                }
+            }
+
+            closeFile(fileId) {
+                const fileIndex = this.files.findIndex(f => f.id === fileId);
+                if (fileIndex === -1) return;
+
+                const file = this.files[fileIndex];
+
+                // Don't close pinned files
+                if (file.pinned) return;
+
+                // If closing active file, switch to another file
+                if (fileId === this.activeFileId) {
+                    const remainingFiles = this.files.filter(f => f.id !== fileId);
+                    if (remainingFiles.length > 0) {
+                        // Switch to the next available file
+                        let nextFile = remainingFiles[Math.min(fileIndex, remainingFiles.length - 1)];
+                        this.activeFileId = nextFile.id;
+                    } else {
+                        this.activeFileId = null;
+                    }
+                }
+
+                // Remove file from array
+                this.files.splice(fileIndex, 1);
+
+                // Update editor
+                if (this.files.length === 0) {
+                    document.getElementById('monaco-editor').style.display = 'none';
+                    document.getElementById('emptyEditor').style.display = 'flex';
+                } else if (this.activeFileId) {
+                    const activeFile = this.getActiveFile();
+                    if (this.monacoEditor && activeFile) {
+                        this.monacoEditor.setValue(activeFile.content);
+                        monaco.editor.setModelLanguage(this.monacoEditor.getModel(), activeFile.language);
+                    }
+                }
+
+                this.renderTabs();
+            }
+        }
+
+        // Initialize the tab manager when page loads
+        window.addEventListener('DOMContentLoaded', () => {
+            new TabManager();
+        });
+    </script>
+</body>
+
+</html>

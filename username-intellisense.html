@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monaco Editor with @Username Intellisense</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #1e1e1e;
+            color: white;
+        }
+
+        #container {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #ccc;
+        }
+
+        .username-highlight {
+            color: #1da1f2 !important;
+            font-weight: bold !important;
+        }
+
+        .hover-image {
+            max-width: 100px;
+            max-height: 100px;
+            border-radius: 50%;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Monaco Editor - @Username Intellisense & CodeLens</h1>
+    <div id="container"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs/loader.js"></script>
+    <script>
+        require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs' } });
+
+        require(['vs/editor/editor.main'], function () {
+            // Username database with metadata
+            const usernameDatabase = {
+                'johndoe': {
+                    name: 'John Doe',
+                    bio: 'Software Developer at TechCorp',
+                    followers: '2.3K',
+                    avatar: 'https://randomuser.me/api/portraits/men/1.jpg',
+                    verified: true
+                },
+                'janedeveloper': {
+                    name: 'Jane Developer',
+                    bio: 'Full Stack Engineer & Open Source Contributor',
+                    followers: '5.7K',
+                    avatar: 'https://randomuser.me/api/portraits/women/2.jpg',
+                    verified: false
+                },
+                'techguru': {
+                    name: 'Tech Guru',
+                    bio: 'Technology Enthusiast & Blogger',
+                    followers: '12.1K',
+                    avatar: 'https://randomuser.me/api/portraits/men/3.jpg',
+                    verified: true
+                },
+                'codemaster': {
+                    name: 'Code Master',
+                    bio: 'Senior Software Architect',
+                    followers: '8.9K',
+                    avatar: 'https://randomuser.me/api/portraits/women/4.jpg',
+                    verified: false
+                },
+                'devlife': {
+                    name: 'DevLife',
+                    bio: 'Programming Tutorials & Tips',
+                    followers: '15.2K',
+                    avatar: 'https://randomuser.me/api/portraits/men/5.jpg',
+                    verified: true
+                },
+                'webwizard': {
+                    name: 'Web Wizard',
+                    bio: 'Frontend Specialist & UI/UX Designer',
+                    followers: '6.4K',
+                    avatar: 'https://randomuser.me/api/portraits/women/6.jpg',
+                    verified: false
+                },
+                'aiexpert': {
+                    name: 'AI Expert',
+                    bio: 'Machine Learning Engineer & AI Researcher',
+                    followers: '9.8K',
+                    avatar: 'https://randomuser.me/api/portraits/men/7.jpg',
+                    verified: true
+                },
+                'cloudninja': {
+                    name: 'Cloud Ninja',
+                    bio: 'DevOps Engineer & Cloud Solutions Architect',
+                    followers: '4.2K',
+                    avatar: 'https://randomuser.me/api/portraits/women/8.jpg',
+                    verified: false
+                }
+            };
+
+            const initialMarkdown = `# Team Mentions
+
+Great work on the project! Shoutout to @johndoe for the excellent backend work.
+
+Also want to thank @janedeveloper for the amazing frontend components.
+
+Looking forward to collaboration with @techguru and @codemaster on the next sprint.
+
+Don't forget to follow @devlife for programming tips!
+
+Try typing "@" to see username suggestions...
+
+## Meeting Notes
+- @webwizard will handle the UI redesign
+- @aiexpert is working on the ML integration
+- @cloudninja will set up the deployment pipeline
+`;
+
+            // Create the editor
+            const editor = monaco.editor.create(document.getElementById('container'), {
+                value: initialMarkdown,
+                language: 'markdown',
+                theme: 'vs-dark',
+                automaticLayout: true,
+                minimap: { enabled: false },
+                wordWrap: 'on',
+                codeLens: true
+            });
+
+            // Disable default word-based suggestions for cleaner @ completions
+            editor.updateOptions({
+                wordBasedSuggestions: false,
+                quickSuggestions: {
+                    other: false,
+                    comments: false,
+                    strings: false
+                }
+            });
+
+            // Register completion provider for @usernames
+            monaco.languages.registerCompletionItemProvider('markdown', {
+                triggerCharacters: ['@'],
+                provideCompletionItems: function (model, position) {
+                    const textUntilPosition = model.getValueInRange({
+                        startLineNumber: position.lineNumber,
+                        startColumn: 1,
+                        endLineNumber: position.lineNumber,
+                        endColumn: position.column
+                    });
+
+                    // Check if we're typing after @
+                    const atMatch = textUntilPosition.match(/@(\w*)$/);
+                    if (!atMatch) {
+                        return { suggestions: [] };
+                    }
+
+                    const word = model.getWordUntilPosition(position);
+                    const range = {
+                        startLineNumber: position.lineNumber,
+                        endLineNumber: position.lineNumber,
+                        startColumn: position.column - atMatch[1].length,
+                        endColumn: word.endColumn
+                    };
+
+                    const suggestions = Object.keys(usernameDatabase).map(username => {
+                        const user = usernameDatabase[username];
+                        return {
+                            label: `@${username}`,
+                            kind: monaco.languages.CompletionItemKind.User,
+                            insertText: username,
+                            range: range,
+                            detail: `${user.name} • ${user.followers} followers`,
+                            documentation: {
+                                value: `**${user.name}** ${user.verified ? '✓' : ''}\n\n${user.bio}\n\n**Followers:** ${user.followers}`
+                            },
+                            sortText: username
+                        };
+                    });
+
+                    return { suggestions: suggestions };
+                }
+            });
+
+            // Register hover provider for @usernames
+            monaco.languages.registerHoverProvider('markdown', {
+                provideHover: function (model, position) {
+                    const line = model.getLineContent(position.lineNumber);
+                    const usernameRegex = /@(\w+)/g;
+                    let match;
+
+                    while ((match = usernameRegex.exec(line)) !== null) {
+                        const startColumn = match.index + 1;
+                        const endColumn = startColumn + match[0].length;
+
+                        if (position.column >= startColumn && position.column <= endColumn) {
+                            const username = match[1];
+                            const userInfo = usernameDatabase[username];
+
+                            if (userInfo) {
+                                return {
+                                    range: new monaco.Range(
+                                        position.lineNumber, startColumn,
+                                        position.lineNumber, endColumn
+                                    ),
+                                    contents: [
+                                        {
+                                            value: `**@${username}** ${userInfo.verified ? '✓' : ''}\n\n![Avatar](${userInfo.avatar})\n\n**${userInfo.name}**\n\n${userInfo.bio}\n\n**Followers:** ${userInfo.followers}`,
+                                            supportHtml: true
+                                        }
+                                    ]
+                                };
+                            }
+                        }
+                    }
+
+                    return null;
+                }
+            });
+
+            // Register CodeLens provider for @usernames
+            monaco.languages.registerCodeLensProvider('markdown', {
+                provideCodeLenses: function (model) {
+                    const lenses = [];
+                    const text = model.getValue();
+                    const lines = text.split('\n');
+
+                    lines.forEach((line, lineIndex) => {
+                        const usernameRegex = /@(\w+)/g;
+                        let match;
+
+                        while ((match = usernameRegex.exec(line)) !== null) {
+                            const username = match[1];
+                            if (usernameDatabase[username]) {
+                                const startColumn = match.index + 1;
+
+                                // Google Search lens
+                                lenses.push({
+                                    range: {
+                                        startLineNumber: lineIndex + 1,
+                                        startColumn: startColumn,
+                                        endLineNumber: lineIndex + 1,
+                                        endColumn: startColumn + match[0].length
+                                    },
+                                    id: `username-google-${lineIndex}-${match.index}`,
+                                    command: {
+                                        id: 'username.google',
+                                        title: `🔍 Google`,
+                                        arguments: [username]
+                                    }
+                                });
+
+                                // LMPify lens
+                                lenses.push({
+                                    range: {
+                                        startLineNumber: lineIndex + 1,
+                                        startColumn: startColumn,
+                                        endLineNumber: lineIndex + 1,
+                                        endColumn: startColumn + match[0].length
+                                    },
+                                    id: `username-lmpify-${lineIndex}-${match.index}`,
+                                    command: {
+                                        id: 'username.lmpify',
+                                        title: `🔗 LMPify`,
+                                        arguments: [username]
+                                    }
+                                });
+
+                                // Twitter lens
+                                lenses.push({
+                                    range: {
+                                        startLineNumber: lineIndex + 1,
+                                        startColumn: startColumn,
+                                        endLineNumber: lineIndex + 1,
+                                        endColumn: startColumn + match[0].length
+                                    },
+                                    id: `username-twitter-${lineIndex}-${match.index}`,
+                                    command: {
+                                        id: 'username.twitter',
+                                        title: `🐦 Twitter`,
+                                        arguments: [username]
+                                    }
+                                });
+                            }
+                        }
+                    });
+
+                    return {
+                        lenses: lenses,
+                        dispose: function () { }
+                    };
+                }
+            });
+
+            // Register commands for username actions
+            monaco.editor.addCommand({
+                id: 'username.google',
+                run: function (accessor, username) {
+                    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent('@' + username)}`;
+                    window.open(searchUrl, '_blank');
+                }
+            });
+
+            monaco.editor.addCommand({
+                id: 'username.lmpify',
+                run: function (accessor, username) {
+                    const lmpifyUrl = `https://letmeprompt.com?q=${encodeURIComponent('@' + username)}`;
+                    window.open(lmpifyUrl, '_blank');
+                }
+            });
+
+            monaco.editor.addCommand({
+                id: 'username.twitter',
+                run: function (accessor, username) {
+                    const twitterUrl = `https://twitter.com/${username}`;
+                    window.open(twitterUrl, '_blank');
+                }
+            });
+
+            // Function to highlight @usernames
+            function updateUsernameHighlights() {
+                const model = editor.getModel();
+                const text = model.getValue();
+                const lines = text.split('\n');
+                const decorations = [];
+
+                lines.forEach((line, lineIndex) => {
+                    const usernameRegex = /@(\w+)/g;
+                    let match;
+
+                    while ((match = usernameRegex.exec(line)) !== null) {
+                        const username = match[1];
+                        if (usernameDatabase[username]) {
+                            decorations.push({
+                                range: new monaco.Range(
+                                    lineIndex + 1,
+                                    match.index + 1,
+                                    lineIndex + 1,
+                                    match.index + match[0].length + 1
+                                ),
+                                options: {
+                                    inlineClassName: 'username-highlight'
+                                }
+                            });
+                        }
+                    }
+                });
+
+                editor.deltaDecorations([], decorations);
+            }
+
+            // Update highlights on content change
+            editor.onDidChangeModelContent(() => {
+                clearTimeout(window.highlightTimeout);
+                window.highlightTimeout = setTimeout(updateUsernameHighlights, 100);
+            });
+
+            // Initial highlight update
+            updateUsernameHighlights();
+
+            // Add CSS for username highlighting
+            const style = document.createElement('style');
+            style.textContent = `
+                .username-highlight {
+                    color: #1da1f2 !important;
+                    font-weight: bold !important;
+                }
+                
+                .monaco-editor .codelens-decoration .codelens-decoration-0,
+                .monaco-editor .codelens-decoration .codelens-decoration-1,
+                .monaco-editor .codelens-decoration .codelens-decoration-2 {
+                    margin-right: 8px !important;
+                }
+            `;
+            document.head.appendChild(style);
+
+            console.log('Username intellisense loaded with usernames:', Object.keys(usernameDatabase));
+        });
+    </script>
+</body>
+
+</html>

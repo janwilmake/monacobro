@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Monaco Markdown Editor with Multi-Action URL Codelens</title>
+    <script src="https://unpkg.com/monaco-editor@0.44.0/min/vs/loader.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+
+        #container {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Markdown Editor with Multi-Action URL Codelens</h1>
+    <div id="container"></div>
+
+    <script>
+        require.config({ paths: { vs: 'https://unpkg.com/monaco-editor@0.44.0/min/vs' } });
+
+        require(['vs/editor/editor.main'], function () {
+            const markdownContent = `# Project Documentation
+
+Visit [GitHub Repository](https://github.com/microsoft/monaco-editor) for the source code.
+
+Read the [API Documentation](https://microsoft.github.io/monaco-editor/api/index.html) for implementation details.
+
+Check [npm package](https://www.npmjs.com/package/monaco-editor) for installation instructions.
+
+Learn more about [TypeScript](https://www.typescriptlang.org/docs/) language features.
+
+## External Resources
+- [Stack Overflow](https://stackoverflow.com/questions/tagged/monaco-editor)
+- [VS Code](https://code.visualstudio.com)
+`;
+
+            function getDomainFromUrl(url) {
+                try {
+                    return new URL(url).hostname;
+                } catch {
+                    return url;
+                }
+            }
+
+            function generateRelatedLinks(url) {
+                const domain = getDomainFromUrl(url);
+                const encodedUrl = encodeURIComponent(url);
+                const encodedDomain = encodeURIComponent(domain);
+
+                return {
+                    google: `https://www.google.com/search?q=site:${encodedDomain}`,
+                    wayback: `https://web.archive.org/web/*/${url}`,
+                    similar: `https://www.similarsites.com/site/${encodedDomain}`,
+                    whois: `https://whois.net/${encodedDomain}`
+                };
+            }
+
+            monaco.languages.registerCodeLensProvider('markdown', {
+                provideCodeLenses: function (model) {
+                    const lenses = [];
+                    const text = model.getValue();
+                    const lines = text.split('\n');
+
+                    lines.forEach((line, lineIndex) => {
+                        const urlRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+                        let match;
+
+                        while ((match = urlRegex.exec(line)) !== null) {
+                            const url = match[2];
+                            const links = generateRelatedLinks(url);
+
+                            // Google Search lens
+                            lenses.push({
+                                range: {
+                                    startLineNumber: lineIndex + 1,
+                                    startColumn: 1,
+                                    endLineNumber: lineIndex + 1,
+                                    endColumn: 1
+                                },
+                                id: `url-google-${lineIndex}-${match.index}`,
+                                command: {
+                                    id: 'url.openGoogle',
+                                    title: `Google Search`,
+                                    arguments: [links.google]
+                                }
+                            });
+
+                            // Wayback Machine lens
+                            lenses.push({
+                                range: {
+                                    startLineNumber: lineIndex + 1,
+                                    startColumn: 1,
+                                    endLineNumber: lineIndex + 1,
+                                    endColumn: 1
+                                },
+                                id: `url-wayback-${lineIndex}-${match.index}`,
+                                command: {
+                                    id: 'url.openWayback',
+                                    title: `Archive History`,
+                                    arguments: [links.wayback]
+                                }
+                            });
+
+                            // Similar Sites lens
+                            lenses.push({
+                                range: {
+                                    startLineNumber: lineIndex + 1,
+                                    startColumn: 1,
+                                    endLineNumber: lineIndex + 1,
+                                    endColumn: 1
+                                },
+                                id: `url-similar-${lineIndex}-${match.index}`,
+                                command: {
+                                    id: 'url.openSimilar',
+                                    title: `Similar Sites`,
+                                    arguments: [links.similar]
+                                }
+                            });
+
+                            // WHOIS lens
+                            lenses.push({
+                                range: {
+                                    startLineNumber: lineIndex + 1,
+                                    startColumn: 1,
+                                    endLineNumber: lineIndex + 1,
+                                    endColumn: 1
+                                },
+                                id: `url-whois-${lineIndex}-${match.index}`,
+                                command: {
+                                    id: 'url.openWhois',
+                                    title: `Domain Info`,
+                                    arguments: [links.whois]
+                                }
+                            });
+                        }
+                    });
+
+                    return {
+                        lenses: lenses,
+                        dispose: function () { }
+                    };
+                }
+            });
+
+            // Register commands for each action
+            monaco.editor.addCommand({
+                id: 'url.openGoogle',
+                run: function (accessor, searchUrl) {
+                    window.open(searchUrl, '_blank');
+                }
+            });
+
+            monaco.editor.addCommand({
+                id: 'url.openWayback',
+                run: function (accessor, archiveUrl) {
+                    window.open(archiveUrl, '_blank');
+                }
+            });
+
+            monaco.editor.addCommand({
+                id: 'url.openSimilar',
+                run: function (accessor, similarUrl) {
+                    window.open(similarUrl, '_blank');
+                }
+            });
+
+            monaco.editor.addCommand({
+                id: 'url.openWhois',
+                run: function (accessor, whoisUrl) {
+                    window.open(whoisUrl, '_blank');
+                }
+            });
+
+            const editor = monaco.editor.create(document.getElementById('container'), {
+                value: markdownContent,
+                language: 'markdown',
+                theme: 'vs-dark',
+                codeLens: true,
+                minimap: { enabled: false },
+                fontSize: 14,
+                lineNumbers: 'on'
+            });
+        });
+    </script>
+</body>
+
+</html>

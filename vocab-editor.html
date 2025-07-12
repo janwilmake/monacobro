@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monaco Editor with Custom Vocabulary</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+
+        #container {
+            width: 100%;
+            height: 500px;
+            border: 1px solid #ccc;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .instructions {
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Monaco Editor with Custom Vocabulary</h1>
+    <div class="instructions">
+        <strong>Features:</strong>
+        <ul>
+            <li>Type to see custom autocomplete suggestions (default suggestions disabled)</li>
+            <li>Vocabulary words appear in blue and update in real-time</li>
+            <li>Hover over blue words to see definitions</li>
+            <li>Cmd+Click (Mac) or Ctrl+Click (Windows/Linux) on blue words to search Google</li>
+            <li>Try typing: <code>java</code>, <code>py</code>, <code>rea</code>, etc.</li>
+        </ul>
+    </div>
+    <div id="container"></div>
+
+    <script src="https://unpkg.com/monaco-editor@0.44.0/min/vs/loader.js"></script>
+    <script>
+        // Hardcoded vocabulary with definitions
+        const vocabulary = {
+            'javascript': 'A high-level, interpreted programming language that conforms to the ECMAScript specification.',
+            'python': 'A high-level, interpreted programming language with dynamic semantics and simple syntax.',
+            'react': 'A JavaScript library for building user interfaces, maintained by Facebook.',
+            'nodejs': 'A JavaScript runtime built on Chrome\'s V8 JavaScript engine for server-side development.',
+            'typescript': 'A strongly typed programming language that builds on JavaScript by adding static type definitions.',
+            'html': 'HyperText Markup Language - the standard markup language for creating web pages.',
+            'css': 'Cascading Style Sheets - a style sheet language used for describing the presentation of HTML documents.',
+            'mongodb': 'A document-oriented NoSQL database program that uses JSON-like documents with optional schemas.',
+            'express': 'A minimal and flexible Node.js web application framework that provides robust features for web applications.',
+            'vue': 'A progressive JavaScript framework for building user interfaces and single-page applications.',
+            'angular': 'A TypeScript-based open-source web application framework led by the Angular Team at Google.',
+            'docker': 'A platform for developing, shipping, and running applications using containerization technology.',
+            'kubernetes': 'An open-source container orchestration platform for automating deployment and management.',
+            'git': 'A distributed version control system for tracking changes in source code during software development.',
+            'github': 'A web-based hosting service for version control using Git, owned by Microsoft.'
+        };
+
+        require.config({ paths: { vs: 'https://unpkg.com/monaco-editor@0.44.0/min/vs' } });
+
+        require(['vs/editor/editor.main'], function () {
+            // Register a new language
+            monaco.languages.register({ id: 'customLanguage' });
+
+            // Define the tokenizer for real-time syntax highlighting
+            monaco.languages.setMonarchTokensProvider('customLanguage', {
+                tokenizer: {
+                    root: [
+                        // Create regex pattern for vocabulary words (case insensitive)
+                        [new RegExp(`\\b(${Object.keys(vocabulary).join('|')})\\b`, 'i'), 'vocabulary-word'],
+                        [/[a-zA-Z_]\w*/, 'identifier'],
+                        [/\d+/, 'number'],
+                        [/\s+/, 'white'],
+                        [/./, 'text']
+                    ]
+                }
+            });
+
+            // Define theme with blue color for vocabulary words
+            monaco.editor.defineTheme('customTheme', {
+                base: 'vs',
+                inherit: true,
+                rules: [
+                    { token: 'vocabulary-word', foreground: '0066cc', fontStyle: 'bold' },
+                    { token: 'identifier', foreground: '000000' },
+                    { token: 'text', foreground: '000000' }
+                ],
+                colors: {}
+            });
+
+            // Provide custom autocomplete suggestions (only vocabulary words)
+            monaco.languages.registerCompletionItemProvider('customLanguage', {
+                provideCompletionItems: function (model, position) {
+                    const word = model.getWordUntilPosition(position);
+                    const range = {
+                        startLineNumber: position.lineNumber,
+                        endLineNumber: position.lineNumber,
+                        startColumn: word.startColumn,
+                        endColumn: word.endColumn
+                    };
+
+                    const suggestions = Object.keys(vocabulary)
+                        .filter(vocabWord =>
+                            vocabWord.toLowerCase().startsWith(word.word.toLowerCase())
+                        )
+                        .map(vocabWord => ({
+                            label: vocabWord,
+                            kind: monaco.languages.CompletionItemKind.Keyword,
+                            insertText: vocabWord,
+                            range: range,
+                            detail: vocabulary[vocabWord],
+                            documentation: vocabulary[vocabWord]
+                        }));
+
+                    return { suggestions: suggestions };
+                }
+            });
+
+            // Provide hover information
+            monaco.languages.registerHoverProvider('customLanguage', {
+                provideHover: function (model, position) {
+                    const word = model.getWordAtPosition(position);
+                    if (word) {
+                        const wordText = word.word.toLowerCase();
+                        if (vocabulary[wordText]) {
+                            return {
+                                range: new monaco.Range(
+                                    position.lineNumber,
+                                    word.startColumn,
+                                    position.lineNumber,
+                                    word.endColumn
+                                ),
+                                contents: [
+                                    { value: `**${wordText}**` },
+                                    { value: vocabulary[wordText] },
+                                    { value: '_Cmd+Click (Mac) or Ctrl+Click (Windows/Linux) to search on Google_' }
+                                ]
+                            };
+                        }
+                    }
+                    return null;
+                }
+            });
+
+            // Create the editor
+            const editor = monaco.editor.create(document.getElementById('container'), {
+                value: `Welcome to the custom vocabulary editor!
+
+Start typing words like: javascript, python, react, nodejs, typescript, html, css, mongodb
+
+- Notice how vocabulary words turn blue as you type
+- Use autocomplete (Ctrl+Space) to see suggestions
+- Hover over blue words for definitions
+- Cmd+Click or Ctrl+Click blue words to search Google
+
+Try typing "java" and see the autocomplete suggestion for "javascript"!`,
+                language: 'customLanguage',
+                theme: 'customTheme',
+                fontSize: 14,
+                wordWrap: 'on',
+                minimap: { enabled: false },
+                // Disable default language features
+                wordBasedSuggestions: false,
+                // Enable our custom suggestions
+                quickSuggestions: {
+                    other: true,
+                    comments: false,
+                    strings: false
+                },
+                suggestOnTriggerCharacters: true,
+                acceptSuggestionOnEnter: 'on',
+                tabCompletion: 'on'
+            });
+
+            // Handle Cmd+Click / Ctrl+Click for navigation
+            editor.onMouseDown(function (e) {
+                // Check if Cmd (Mac) or Ctrl (Windows/Linux) is pressed
+                if (e.event.metaKey || e.event.ctrlKey) {
+                    const position = e.target.position;
+                    if (position) {
+                        const model = editor.getModel();
+                        const word = model.getWordAtPosition(position);
+
+                        if (word) {
+                            const wordText = word.word.toLowerCase();
+                            if (vocabulary[wordText]) {
+                                // Prevent default editor behavior
+                                e.event.preventDefault();
+                                e.event.stopPropagation();
+
+                                // Open Google search in new tab
+                                const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(wordText + ' programming')}`;
+                                window.open(searchUrl, '_blank');
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Change cursor style when hovering over vocabulary words with modifier key
+            let isModifierPressed = false;
+
+            document.addEventListener('keydown', function (e) {
+                if (e.metaKey || e.ctrlKey) {
+                    isModifierPressed = true;
+                    updateCursorStyle();
+                }
+            });
+
+            document.addEventListener('keyup', function (e) {
+                if (!e.metaKey && !e.ctrlKey) {
+                    isModifierPressed = false;
+                    updateCursorStyle();
+                }
+            });
+
+            editor.onMouseMove(function (e) {
+                updateCursorStyle();
+            });
+
+            function updateCursorStyle() {
+                if (isModifierPressed) {
+                    const position = editor.getPositionForOffset(editor.getModel().getOffsetAt(editor.getPosition()));
+                    const word = editor.getModel().getWordAtPosition(position);
+
+                    if (word && vocabulary[word.word.toLowerCase()]) {
+                        editor.getDomNode().style.cursor = 'pointer';
+                    } else {
+                        editor.getDomNode().style.cursor = 'text';
+                    }
+                } else {
+                    editor.getDomNode().style.cursor = 'text';
+                }
+            }
+
+            // Auto-resize editor when window resizes
+            window.addEventListener('resize', function () {
+                editor.layout();
+            });
+
+            // Force re-tokenization when content changes to ensure real-time highlighting
+            editor.onDidChangeModelContent(function () {
+                // Small delay to ensure tokenization is complete
+                setTimeout(() => {
+                    const model = editor.getModel();
+                    monaco.editor.setModelLanguage(model, 'customLanguage');
+                }, 1);
+            });
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monaco Markdown Editor with Fast Spell Check</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        #container {
+            width: 100%;
+            height: 500px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Monaco Markdown Editor with Fast Spell Check</h1>
+    <div id="container"></div>
+
+    <script src="https://unpkg.com/monaco-editor@latest/min/vs/loader.js"></script>
+    <script>
+        require.config({ paths: { 'vs': 'https://unpkg.com/monaco-editor@latest/min/vs' } });
+
+        let editor;
+
+        // Only common misspellings with their corrections
+        const corrections = {
+            'recieve': 'receive',
+            'occured': 'occurred',
+            'seperate': 'separate',
+            'definately': 'definitely',
+            'accomodate': 'accommodate',
+            'necesary': 'necessary',
+            'embarass': 'embarrass',
+            'tommorow': 'tomorrow',
+            'misspeled': 'misspelled',
+            'writting': 'writing',
+            'begining': 'beginning',
+            'comming': 'coming',
+            'runing': 'running',
+            'geting': 'getting',
+            'puting': 'putting',
+            'makeing': 'making',
+            'changeing': 'changing',
+            'moveing': 'moving',
+            'exmaple': 'example',
+            'featuers': 'features',
+            'dictonary': 'dictionary',
+            'sugestions': 'suggestions',
+            'variabled': 'variable',
+            'wrold': 'world',
+            'demontrates': 'demonstrates',
+            'powerfull': 'powerful',
+            'editng': 'editing',
+            'sophistcated': 'sophisticated',
+            'teh': 'the',
+            'adn': 'and',
+            'taht': 'that',
+            'thier': 'their',
+            'youre': "you're",
+            'cant': "can't",
+            'wont': "won't",
+            'dont': "don't"
+        };
+
+        require(['vs/editor/editor.main'], function () {
+            const initialContent = `# My Blog Post
+
+This is an **exmaple** of a markdown document with some misspeled words that we can fix.
+
+## Features
+
+- Real-time spell checking
+- Multiple sugestions per word
+- Easy fixes with lightbulb UI
+
+### Code Example
+
+\`\`\`javascript
+// This is a code block - words here shouldn't be spell checked
+const myVarible = "Hello Wrold";
+console.log(myVarible);
+\`\`\`
+
+## Conclusion
+
+This demontrates how powerfull Monaco can be for editng markdown!
+`;
+
+            editor = monaco.editor.create(document.getElementById('container'), {
+                value: initialContent,
+                language: 'markdown',
+                theme: 'vs-light',
+                minimap: { enabled: false },
+                lightbulb: { enabled: true },
+                wordWrap: 'on'
+            });
+
+            // Code action provider for fixes
+            monaco.languages.registerCodeActionProvider('markdown', {
+                provideCodeActions: function (model, range, context) {
+                    const actions = [];
+
+                    const markers = monaco.editor.getModelMarkers({
+                        resource: model.uri
+                    }).filter(marker =>
+                        marker.startLineNumber <= range.endLineNumber &&
+                        marker.endLineNumber >= range.startLineNumber &&
+                        marker.code === 'spelling'
+                    );
+
+                    markers.forEach(marker => {
+                        const word = model.getValueInRange({
+                            startLineNumber: marker.startLineNumber,
+                            startColumn: marker.startColumn,
+                            endLineNumber: marker.endLineNumber,
+                            endColumn: marker.endColumn
+                        });
+
+                        const correction = corrections[word.toLowerCase()];
+                        if (correction) {
+                            actions.push({
+                                title: `Fix: ${word} → ${correction}`,
+                                kind: 'quickfix',
+                                edit: {
+                                    edits: [{
+                                        resource: model.uri,
+                                        textEdit: {
+                                            range: {
+                                                startLineNumber: marker.startLineNumber,
+                                                startColumn: marker.startColumn,
+                                                endLineNumber: marker.endLineNumber,
+                                                endColumn: marker.endColumn
+                                            },
+                                            text: correction
+                                        }
+                                    }]
+                                }
+                            });
+                        }
+                    });
+
+                    return { actions, dispose: () => { } };
+                }
+            });
+
+            function spellCheck() {
+                const model = editor.getModel();
+                const content = model.getValue();
+                const markers = [];
+                const lines = content.split('\n');
+
+                let inCodeBlock = false;
+
+                lines.forEach((line, lineIndex) => {
+                    const lineNumber = lineIndex + 1;
+
+                    // Toggle code block state
+                    if (line.trim().startsWith('```')) {
+                        inCodeBlock = !inCodeBlock;
+                        return;
+                    }
+
+                    // Skip code blocks and inline code
+                    if (inCodeBlock) return;
+
+                    const wordRegex = /\b[a-zA-Z']+\b/g;
+                    let match;
+
+                    while ((match = wordRegex.exec(line)) !== null) {
+                        const word = match[0];
+
+                        // Skip if inside inline code (backticks)
+                        const beforeWord = line.substring(0, match.index);
+                        const backticksBefore = (beforeWord.match(/`/g) || []).length;
+                        if (backticksBefore % 2 === 1) continue;
+
+                        // Only mark words we have corrections for
+                        if (corrections[word.toLowerCase()]) {
+                            markers.push({
+                                startLineNumber: lineNumber,
+                                startColumn: match.index + 1,
+                                startColumn: match.index + 1,
+                                endLineNumber: lineNumber,
+                                endColumn: match.index + 1 + word.length,
+                                message: `Misspelled: ${word}`,
+                                severity: monaco.MarkerSeverity.Warning,
+                                code: 'spelling'
+                            });
+                        }
+                    }
+                });
+
+                monaco.editor.setModelMarkers(model, 'spell-check', markers);
+            }
+
+            // Run spell check on startup
+            setTimeout(spellCheck, 100);
+
+            // Auto spell check on changes (debounced)
+            let timeout;
+            editor.onDidChangeModelContent(() => {
+                clearTimeout(timeout);
+                timeout = setTimeout(spellCheck, 300);
+            });
+        });
+    </script>
+</body>
+
+</html>

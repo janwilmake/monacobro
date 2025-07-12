@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monaco Editor with Auto Theme</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            transition: background-color 0.3s ease;
+        }
+
+        #editor-container {
+            width: 100%;
+            height: 80vh;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .info {
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #1e1e1e;
+                color: #d4d4d4;
+            }
+
+            .info {
+                background: #2d2d30;
+                color: #d4d4d4;
+            }
+
+            #editor-container {
+                border-color: #464647;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="info">
+        <h2>Monaco Editor with Auto Theme Detection</h2>
+        <p>The editor automatically adjusts to your system theme and logs content changes and cursor position to the
+            console.</p>
+        <p><strong>Check the browser console to see the logs!</strong></p>
+    </div>
+
+    <div id="editor-container"></div>
+
+    <script src="https://unpkg.com/monaco-editor@0.44.0/min/vs/loader.js"></script>
+    <script>
+        // Set initial content
+        window.data = {
+            content: `# Welcome to Monaco Editor!
+
+This is a **markdown** editor with the following features:
+
+## Features
+- 🌓 Automatic theme detection (light/dark)
+- 📝 Real-time content and cursor position logging
+- 🎯 Markdown language support by default
+- ⚡ Powered by Monaco Editor
+
+## Try it out!
+- Type something and check the console
+- Move your cursor around
+- Switch your system theme to see the editor adapt
+
+### Code Example
+\`\`\`javascript
+console.log("Hello from Monaco Editor!");
+\`\`\`
+
+> **Note:** All changes and cursor movements are logged to the browser console.
+
+---
+
+*Start editing to see the magic happen!*`
+        };
+
+        // Function to detect system theme
+        function getSystemTheme() {
+            return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'vs-dark' : 'vs';
+        }
+
+        // Function to log editor state
+        function logEditorState(editor, changeType = 'content') {
+            const content = editor.getValue();
+            const position = editor.getPosition();
+            const selection = editor.getSelection();
+
+            console.group(`📝 Editor ${changeType} change`);
+            console.log('Content length:', content.length);
+            console.log('Content preview:', content.substring(0, 100) + (content.length > 100 ? '...' : ''));
+            console.log('Cursor position:', {
+                line: position.lineNumber,
+                column: position.column
+            });
+            console.log('Selection:', {
+                startLine: selection.startLineNumber,
+                startColumn: selection.startColumn,
+                endLine: selection.endLineNumber,
+                endColumn: selection.endColumn,
+                isEmpty: selection.isEmpty()
+            });
+            console.groupEnd();
+        }
+
+        // Initialize Monaco Editor
+        require.config({
+            paths: {
+                'vs': 'https://unpkg.com/monaco-editor@0.44.0/min/vs'
+            }
+        });
+
+        require(['vs/editor/editor.main'], function () {
+            let editor;
+
+            // Create editor with initial theme
+            function createEditor() {
+                const currentTheme = getSystemTheme();
+
+                editor = monaco.editor.create(document.getElementById('editor-container'), {
+                    value: window.data.content,
+                    language: 'markdown',
+                    theme: currentTheme,
+                    automaticLayout: true,
+                    wordWrap: 'on',
+                    minimap: {
+                        enabled: true
+                    },
+                    scrollBeyondLastLine: false,
+                    fontSize: 14,
+                    lineHeight: 20,
+                    padding: {
+                        top: 10,
+                        bottom: 10
+                    }
+                });
+
+                // Listen for content changes
+                editor.onDidChangeModelContent((event) => {
+                    logEditorState(editor, 'content');
+                });
+
+                // Listen for cursor position changes
+                editor.onDidChangeCursorPosition((event) => {
+                    logEditorState(editor, 'cursor');
+                });
+
+                // Listen for selection changes
+                editor.onDidChangeCursorSelection((event) => {
+                    logEditorState(editor, 'selection');
+                });
+
+                console.log('🚀 Monaco Editor initialized with theme:', currentTheme);
+                console.log('📊 Initial editor state:');
+                logEditorState(editor, 'initialization');
+            }
+
+            // Listen for system theme changes
+            function setupThemeListener() {
+                const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+                mediaQuery.addEventListener('change', (e) => {
+                    const newTheme = e.matches ? 'vs-dark' : 'vs';
+                    monaco.editor.setTheme(newTheme);
+                    console.log('🎨 Theme changed to:', newTheme);
+                });
+            }
+
+            // Initialize everything
+            createEditor();
+            setupThemeListener();
+
+            // Make editor globally accessible for debugging
+            window.monacoEditor = editor;
+        });
+
+        // Additional system theme change listener for body styling
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+            document.body.style.transition = 'background-color 0.3s ease, color 0.3s ease';
+        });
+    </script>
+</body>
+
+</html>

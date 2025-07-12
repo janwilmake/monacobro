@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown Section Parser</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            display: flex;
+            gap: 20px;
+            max-width: 1400px;
+        }
+
+        .input-section,
+        .output-section {
+            flex: 1;
+        }
+
+        textarea {
+            width: 100%;
+            height: 400px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            resize: vertical;
+        }
+
+        .output-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .sections-output,
+        .active-section-output {
+            height: 190px;
+        }
+
+        .active-section-output {
+            background-color: #fff3cd;
+            border-color: #ffeaa7;
+        }
+
+        .cursor-info {
+            background-color: #e9ecef;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+
+        h3 {
+            margin: 10px 0 5px 0;
+            color: #333;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Markdown Section Parser</h1>
+    <div class="container">
+        <div class="input-section">
+            <h3>Markdown Input</h3>
+            <textarea id="markdownInput" placeholder="Type your markdown here...">
+# Introduction
+This is the introduction section. It contains some basic information about the document.
+
+## Getting Started
+Here's how to get started with this example.
+
+### Prerequisites
+- Node.js
+- A text editor
+
+## Configuration
+This section covers configuration options.
+
+### Database Setup
+Configure your database connection here.
+
+### Environment Variables
+Set up your environment variables:
+- API_KEY
+- DATABASE_URL
+
+# Advanced Topics
+This section covers more advanced usage.
+
+## Performance Optimization
+Tips for better performance.
+
+## Troubleshooting
+Common issues and solutions.
+            </textarea>
+        </div>
+
+        <div class="output-section">
+            <div class="cursor-info" id="cursorInfo">
+                Cursor Position: Line 1, Column 1
+            </div>
+
+            <h3>All Sections</h3>
+            <textarea id="sectionsOutput" class="sections-output" readonly></textarea>
+
+            <h3>Active Section</h3>
+            <textarea id="activeSectionOutput" class="active-section-output" readonly></textarea>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Represents a cursor position or selection range in the editor
+         * @typedef {Object} CursorPosition
+         * @property {number} startLineNumber - The line number where the selection starts (1-indexed)
+         * @property {number} startColumn - The column number where the selection starts (1-indexed)
+         * @property {number} endLineNumber - The line number where the selection ends (1-indexed)
+         * @property {number} endColumn - The column number where the selection ends (1-indexed)
+         */
+
+        /**
+         * Represents the current state of the markdown editor
+         * @typedef {Object} EditorState
+         * @property {string} content - The complete markdown content
+         * @property {CursorPosition} selection - The current cursor position or selection range
+         */
+
+        /**
+         * Represents a markdown section with its metadata
+         * @typedef {Object} MarkdownSection
+         * @property {string} title - The section title (header text)
+         * @property {string} content - The complete content of the section including the header
+         * @property {number} startLine - The line number where the section starts (1-indexed)
+         * @property {number} endLine - The line number where the section ends (1-indexed)
+         * @property {number} level - The header level (1-6, corresponding to H1-H6)
+         */
+
+        /**
+         * Result of parsing markdown sections
+         * @typedef {Object} ParseResult
+         * @property {MarkdownSection[]} sections - Array of all parsed sections
+         * @property {MarkdownSection} activeSection - The section where the cursor is currently located
+         * @property {number} activeSectionIndex - The index of the active section in the sections array
+         */
+
+        /**
+         * Parses markdown content into sections and determines the active section based on cursor position
+         * @param {EditorState} editorState - The current state of the editor
+         * @returns {ParseResult} The parsed sections and active section information
+         */
+        function parseMarkdownSections(editorState) {
+            const { content, selection } = editorState;
+            const lines = content.split('\n');
+            /** @type {MarkdownSection[]} */
+            const sections = [];
+
+            /** @type {MarkdownSection} */
+            let currentSection = {
+                title: 'Untitled Section',
+                content: '',
+                startLine: 1,
+                endLine: 1,
+                level: 0
+            };
+
+            let lineNumber = 1;
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const headerMatch = line.match(/^(#{1,6})\s+(.+)$/);
+
+                if (headerMatch) {
+                    // Save previous section if it has content
+                    if (currentSection.content.trim() || sections.length === 0) {
+                        currentSection.endLine = lineNumber - 1;
+                        if (currentSection.endLine < currentSection.startLine) {
+                            currentSection.endLine = currentSection.startLine;
+                        }
+                        sections.push({ ...currentSection });
+                    }
+
+                    // Start new section
+                    const level = headerMatch[1].length;
+                    const title = headerMatch[2];
+                    currentSection = {
+                        title: title,
+                        content: line + '\n',
+                        startLine: lineNumber,
+                        endLine: lineNumber,
+                        level: level
+                    };
+                } else {
+                    // Add line to current section
+                    currentSection.content += line + '\n';
+                }
+                lineNumber++;
+            }
+
+            // Don't forget the last section
+            if (currentSection.content.trim()) {
+                currentSection.endLine = lineNumber - 1;
+                sections.push(currentSection);
+            }
+
+            // Find active section based on cursor position
+            const cursorLine = selection.startLineNumber;
+            let activeSection = sections[0]; // Default to first section
+
+            for (const section of sections) {
+                if (cursorLine >= section.startLine && cursorLine <= section.endLine) {
+                    activeSection = section;
+                    break;
+                }
+            }
+
+            return {
+                sections: sections,
+                activeSection: activeSection,
+                activeSectionIndex: sections.indexOf(activeSection)
+            };
+        }
+
+        /**
+         * Gets the cursor position from a textarea element
+         * @param {HTMLTextAreaElement} textarea - The textarea element to get cursor position from
+         * @returns {CursorPosition} The cursor position information
+         */
+        function getCursorPosition(textarea) {
+            const text = textarea.value;
+            const cursorPos = textarea.selectionStart;
+            const textBeforeCursor = text.substring(0, cursorPos);
+            const lines = textBeforeCursor.split('\n');
+            const lineNumber = lines.length;
+            const columnNumber = lines[lines.length - 1].length + 1;
+
+            // Calculate end position for selection
+            const endCursorPos = textarea.selectionEnd;
+            const textBeforeEndCursor = text.substring(0, endCursorPos);
+            const endLines = textBeforeEndCursor.split('\n');
+            const endLineNumber = endLines.length;
+            const endColumnNumber = endLines[endLines.length - 1].length + 1;
+
+            return {
+                startLineNumber: lineNumber,
+                startColumn: columnNumber,
+                endLineNumber: endLineNumber,
+                endColumn: endColumnNumber
+            };
+        }
+
+        /**
+         * Formats the sections output for display, highlighting the active section
+         * @param {MarkdownSection[]} sections - Array of all sections
+         * @param {number} activeSectionIndex - Index of the currently active section
+         * @returns {string} Formatted string representation of all sections
+         */
+        function formatSectionsOutput(sections, activeSectionIndex) {
+            return sections.map((section, index) => {
+                const prefix = index === activeSectionIndex ? '>>> ' : '    ';
+                const indent = '  '.repeat(Math.max(0, section.level - 1));
+                return `${prefix}${indent}${section.title} (Lines ${section.startLine}-${section.endLine})`;
+            }).join('\n');
+        }
+
+        /**
+         * Formats the active section information for display
+         * @param {MarkdownSection} activeSection - The currently active section
+         * @returns {string} Formatted string representation of the active section
+         */
+        function formatActiveSectionOutput(activeSection) {
+            if (!activeSection) return 'No active section';
+
+            return `Title: ${activeSection.title}
+Level: H${activeSection.level}
+Lines: ${activeSection.startLine}-${activeSection.endLine}
+
+Content:
+${activeSection.content.trim()}`;
+        }
+
+        /**
+         * Updates all output displays based on the current markdown input
+         * This function is called whenever the input changes or cursor moves
+         * @returns {void}
+         */
+        function updateOutput() {
+            const textarea = /** @type {HTMLTextAreaElement} */ (document.getElementById('markdownInput'));
+            const content = textarea.value;
+            const selection = getCursorPosition(textarea);
+
+            /** @type {EditorState} */
+            const editorState = { content, selection };
+            const result = parseMarkdownSections(editorState);
+
+            // Update cursor info
+            const cursorInfoElement = /** @type {HTMLElement} */ (document.getElementById('cursorInfo'));
+            cursorInfoElement.textContent =
+                `Cursor Position: Line ${selection.startLineNumber}, Column ${selection.startColumn}` +
+                (selection.startLineNumber !== selection.endLineNumber || selection.startColumn !== selection.endColumn
+                    ? ` → Line ${selection.endLineNumber}, Column ${selection.endColumn}` : '');
+
+            // Update sections output
+            const sectionsOutputElement = /** @type {HTMLTextAreaElement} */ (document.getElementById('sectionsOutput'));
+            sectionsOutputElement.value = formatSectionsOutput(result.sections, result.activeSectionIndex);
+
+            // Update active section output
+            const activeSectionOutputElement = /** @type {HTMLTextAreaElement} */ (document.getElementById('activeSectionOutput'));
+            activeSectionOutputElement.value = formatActiveSectionOutput(result.activeSection);
+        }
+
+        /**
+         * Initializes event listeners and performs initial setup
+         * @returns {void}
+         */
+        function initialize() {
+            const markdownInput = /** @type {HTMLTextAreaElement} */ (document.getElementById('markdownInput'));
+
+            // Add event listeners for various input and cursor movement events
+            markdownInput.addEventListener('input', updateOutput);
+            markdownInput.addEventListener('selectionchange', updateOutput);
+            markdownInput.addEventListener('keyup', updateOutput);
+            markdownInput.addEventListener('mouseup', updateOutput);
+            markdownInput.addEventListener('focus', updateOutput);
+
+            // Perform initial update
+            updateOutput();
+        }
+
+        // Initialize the application when the DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initialize);
+        } else {
+            initialize();
+        }
+    </script>
+</body>
+
+</html>
