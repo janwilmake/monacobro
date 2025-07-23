@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Monaco, bro</title>
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="You might not need to fork VSCode" />
+    <meta property="og:description" content="MonacoBro – Monaco made simple" />
+    <meta property="og:image" content="https://monacobro.com/bro.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:url" content="https://monacobro.com" />
+    <meta property="og:type" content="website" />
+    <!-- Twitter Card Meta -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="You might not need to fork VSCode" />
+    <meta name="twitter:description" content="MonacoBro – Monaco made simple" />
+    <meta name="twitter:image" content="https://monacobro.com/bro.png" />
+
+    <style>
+        :root {
+            --bg-color: #1e1e1e;
+            --text-color: #d4d4d4;
+            --border-color: #333333;
+            --link-color: #569cd6;
+            --link-hover-color: #9cdcfe;
+        }
+
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Ubuntu", "Droid Sans", sans-serif;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 0.5em;
+            color: var(--text-color);
+            font-weight: 600;
+        }
+
+        p {
+            font-size: 1.1em;
+            margin-bottom: 1.5em;
+            color: var(--text-color);
+        }
+
+        a {
+            color: var(--link-color);
+            text-decoration: none;
+        }
+
+        a:hover {
+            color: var(--link-hover-color);
+            text-decoration: underline;
+        }
+
+        .intro {
+            margin-bottom: 3em;
+            padding: 30px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+
+        .tweet-container {
+            display: flex;
+            justify-content: center;
+            margin: 3em 0;
+            padding: 20px;
+        }
+
+        .tweet-wrapper {
+            max-width: 550px;
+            width: 100%;
+        }
+
+        /* Dark theme for embedded tweet */
+        .twitter-tweet {
+            margin: 0 auto !important;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px 15px;
+            }
+
+            h1 {
+                font-size: 2em;
+            }
+
+            p {
+                font-size: 1em;
+            }
+
+            .intro {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Welcome to Monaco, bro</h1>
+
+        <div class="intro">
+            <p>
+                You might not need to fork VSCode. Monaco is the underlying library that is used at the core of VSCode.
+                It has very powerful primitives, and allows us to build things similar to VSCode but fully web-first.
+            </p>
+
+            <p>
+                On this website I'm showcasing some of my UX experiments that I serve as modular templates for building
+                cool new UX experiences based on the <a href="https://github.com/microsoft/monaco-editor"
+                    target="_blank" rel="noopener noreferrer">monaco editor</a>.
+            </p>
+
+            <p>
+                Please use this as inspiration of what can be done with it. Let's build the future of editing together!
+                Find me <a href="https://x.com/janwilmake" target="_blank" rel="noopener noreferrer">on X</a>
+            </p>
+
+            <p>
+                Please "view source" on any of these pages (its just html, bro) or star it
+                <a href="https://github.com/janwilmake/monacobro" target="_blank" rel="noopener noreferrer">on
+                    GitHub</a>
+            </p>
+        </div>
+
+        <div class="tweet-container">
+            <div class="tweet-wrapper">
+                <blockquote class="twitter-tweet" data-theme="dark">
+                    <p lang="en" dir="ltr">You might not need to fork VSCode<br><br>MonacoBro – Monaco made simple<a
+                            href="https://t.co/example">https://t.co/example</a></p>
+                    &mdash; Jan (@janwilmake)
+                    <a href="https://twitter.com/janwilmake/status/1947427796516516188">January 18, 2025</a>
+                </blockquote>
+            </div>
+        </div>
+    </div>
+
+    <!-- Twitter embed script -->
+    <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+</body>
+
+</html>

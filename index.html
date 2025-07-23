@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>monacobro.com</title>
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="You might not need to fork VSCode" />
+    <meta property="og:description" content="MonacoBro – Monaco made simple" />
+    <meta property="og:image" content="https://monacobro.com/bro.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:url" content="https://monacobro.com" />
+    <meta property="og:type" content="website" />
+    <!-- Twitter Card Meta -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="You might not need to fork VSCode" />
+    <meta name="twitter:description" content="MonacoBro – Monaco made simple" />
+    <meta name="twitter:image" content="https://monacobro.com/bro.png" />
+
+
+    <style>
+        :root {
+            --bg-color: #1e1e1e;
+            --text-color: #d4d4d4;
+            --border-color: #333333;
+            --link-color: #cccccc;
+            --link-hover-bg: #2a2d2e;
+        }
+
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Ubuntu", "Droid Sans", sans-serif;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: normal;
+        }
+
+        header h1 a {
+            color: var(--text-color);
+            text-decoration: none;
+        }
+
+        header h1 a:hover {
+            text-decoration: underline;
+        }
+
+        .container {
+            display: flex;
+            flex-grow: 1;
+            height: calc(100% - 45px);
+            /* Full height minus header */
+        }
+
+        #menu {
+            width: 250px;
+            flex-shrink: 0;
+            padding: 10px;
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+        }
+
+        #menu ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        #menu li a {
+            display: block;
+            padding: 5px 10px;
+            text-decoration: none;
+            color: var(--link-color);
+            cursor: pointer;
+            border-radius: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #menu li a:hover,
+        #menu li a.active {
+            background-color: var(--link-hover-bg);
+        }
+
+        main {
+            flex-grow: 1;
+        }
+
+        #content-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background-color: white;
+            /* Default iframe bg */
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>
+            <a href="https://x.com/QuentinMCody/status/1947385424457904294" target="_blank" rel="noopener noreferrer">
+                monacobro.com: You might not need to fork VSCode
+            </a>
+        </h1>
+    </header>
+    <div class="container">
+        <nav id="menu"></nav>
+        <main>
+            <iframe id="content-frame" name="content-frame"></iframe>
+        </main>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const menuEl = document.getElementById('menu');
+            const iframe = document.getElementById('content-frame');
+            let currentActiveLink = null;
+
+            try {
+                const response = await fetch('/manifest.json');
+                const manifest = await response.json();
+
+                const htmlFiles = Object.keys(manifest)
+                    .filter(path => path.endsWith('.html'));
+
+                if (htmlFiles.length > 0) {
+                    const ul = document.createElement('ul');
+                    htmlFiles.forEach(file => {
+                        const li = document.createElement('li');
+                        const a = document.createElement('a');
+                        a.textContent = file.replace(/^\//, ''); // remove leading slash
+                        a.href = file;
+                        li.appendChild(a);
+                        ul.appendChild(li);
+                    });
+                    menuEl.appendChild(ul);
+
+                    const setActiveLink = (link) => {
+                        if (currentActiveLink) {
+                            currentActiveLink.classList.remove('active');
+                        }
+                        link.classList.add('active');
+                        currentActiveLink = link;
+                    };
+
+                    menuEl.addEventListener('click', (event) => {
+                        if (event.target.tagName === 'A') {
+                            event.preventDefault();
+                            const path = event.target.getAttribute('href');
+                            iframe.src = path;
+                            setActiveLink(event.target);
+                        }
+                    });
+
+                    // Load the first file by default and set it as active
+                    const firstLink = menuEl.querySelector('a');
+                    if (firstLink) {
+                        iframe.src = firstLink.getAttribute('href');
+                        setActiveLink(firstLink);
+                    }
+                } else {
+                    menuEl.textContent = 'No HTML files found in manifest.';
+                }
+            } catch (error) {
+                console.error('Error loading manifest:', error);
+                menuEl.textContent = 'Error loading manifest file.';
+            }
+        });
+    </script>
+</body>
+
+</html>
