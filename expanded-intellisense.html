@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monaco Editor - Auto-Expanded Suggestions</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #1e1e1e;
+        }
+
+        #container {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #3c3c3c;
+            border-radius: 4px;
+        }
+
+        h1 {
+            color: #cccccc;
+            margin-bottom: 20px;
+        }
+
+        /* Force suggestion details to be visible and expanded */
+        .monaco-editor .suggest-widget .details {
+            display: block !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+            width: 350px !important;
+            min-height: 200px !important;
+        }
+
+        .monaco-editor .suggest-widget.docs-side {
+            width: auto !important;
+        }
+
+        .monaco-editor .suggest-widget .suggest-details-container {
+            display: block !important;
+            width: 350px !important;
+            min-height: 200px !important;
+        }
+
+        .monaco-editor .suggest-widget .suggest-details {
+            display: block !important;
+            width: 100% !important;
+            min-height: 200px !important;
+        }
+
+        /* Ensure the suggestion widget is wide enough */
+        .monaco-editor .suggest-widget {
+            width: auto !important;
+            min-width: 700px !important;
+        }
+
+        /* Make sure the docs are always visible */
+        .monaco-editor .suggest-widget .suggest-details .header {
+            display: block !important;
+        }
+
+        .monaco-editor .suggest-widget .suggest-details .body {
+            display: block !important;
+            min-height: 150px !important;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Monaco Editor - Auto-Triggered Expanded Suggestions</h1>
+    <div id="container"></div>
+
+    <script src="https://unpkg.com/monaco-editor@0.44.0/min/vs/loader.js"></script>
+    <script>
+        require.config({ paths: { vs: 'https://unpkg.com/monaco-editor@0.44.0/min/vs' } });
+
+        require(['vs/editor/editor.main'], function () {
+            // Register custom completion provider for markdown
+            monaco.languages.registerCompletionItemProvider('markdown', {
+                provideCompletionItems: function (model, position) {
+                    const word = model.getWordUntilPosition(position);
+                    const range = {
+                        startLineNumber: position.lineNumber,
+                        endLineNumber: position.lineNumber,
+                        startColumn: word.startColumn,
+                        endColumn: word.endColumn
+                    };
+
+                    const suggestions = [
+                        {
+                            label: 'hello',
+                            kind: monaco.languages.CompletionItemKind.Keyword,
+                            insertText: 'hello',
+                            range: range,
+                            documentation: {
+                                value: `**Hello** - A friendly greeting\n\n---\n\n**Usage Examples:**\n- "Hello, world!" - The classic programming greeting\n- "Hello there!" - A casual greeting\n- "Hello everyone" - Group greeting\n\n**Etymology:** From Old English "hǣl" meaning "whole" or "healthy"\n\n**Related Phrases:**\n- Hello darkness, my old friend\n- Hello from the other side\n- Say hello to my little friend\n\n**Programming Context:**\nThe "Hello, World!" program is traditionally the first program written by students learning a new programming language.\n\n**Cultural Impact:**\nUsed in over 200 programming languages as the introductory example.`
+                            },
+                            detail: 'Greeting keyword - Auto-expanded documentation'
+                        },
+                        {
+                            label: 'world',
+                            kind: monaco.languages.CompletionItemKind.Keyword,
+                            insertText: 'world',
+                            range: range,
+                            documentation: {
+                                value: `**World** - The Earth and all its inhabitants\n\n---\n\n**Common Phrases:**\n- "Hello, world!" - Programming tradition\n- "World peace" - Global harmony\n- "Around the world" - Global journey\n- "World wide web" - The internet\n\n**Related Terms:** planet, earth, globe, universe, cosmos\n\n**Fun Facts:**\n- The "Hello, World!" program tradition started in 1972\n- World population is over 8 billion people\n- There are 195 countries in the world\n- Earth is 4.54 billion years old\n\n**In Different Languages:**\n- Spanish: mundo\n- French: monde\n- German: Welt\n- Japanese: 世界 (sekai)\n\n**Geography:**\nSurface area: 510.1 million km²\nOceans cover 71% of the surface`
+                            },
+                            detail: 'Global reference - Comprehensive auto-expanded docs'
+                        }
+                    ];
+
+                    return { suggestions: suggestions };
+                }
+            });
+
+            // Create the editor
+            const editor = monaco.editor.create(document.getElementById('container'), {
+                value: `# Auto-Expanded Suggestions Demo
+
+Position your cursor after any letter below and suggestions will auto-appear with expanded details:
+
+h
+w
+
+## Try It Out
+- Position cursor after 'h' above
+- Position cursor after 'w' above
+- Suggestions appear automatically with expanded documentation
+
+## Features
+- Auto-triggered suggestions (no Ctrl+Space needed)
+- **Auto-expanded documentation by default**
+- Rich content with proper min-height
+- Immediate visibility of all details
+
+Type more letters to see the auto-complete in action:
+
+`,
+                language: 'markdown',
+                theme: 'vs-dark',
+                fontSize: 14,
+                lineNumbers: 'on',
+                wordWrap: 'on',
+                minimap: { enabled: false },
+                scrollBeyondLastLine: false,
+                suggest: {
+                    showKeywords: true,
+                    showSnippets: true,
+                    showWords: true,
+                    insertMode: 'replace',
+                    filterGraceful: true,
+                    snippetsPreventQuickSuggestions: false,
+                    localityBonus: true,
+                    shareSuggestSelections: true,
+                    showIcons: true,
+                    showStatusBar: true,
+                    preview: true,
+                    previewMode: 'prefix',
+                    showDetails: true
+                },
+                quickSuggestions: {
+                    other: true,
+                    comments: true,
+                    strings: true
+                },
+                suggestOnTriggerCharacters: true,
+                acceptSuggestionOnCommitCharacter: true,
+                acceptSuggestionOnEnter: 'on',
+                wordBasedSuggestions: true
+            });
+
+            let isProcessing = false;
+
+            // Function to auto-trigger suggestions and expand details
+            function autoTriggerAndExpand() {
+                if (isProcessing) return;
+                isProcessing = true;
+
+                // Trigger suggestions
+                editor.trigger('auto', 'editor.action.triggerSuggest', {});
+
+                // Wait for suggestions to appear and then expand them
+                setTimeout(() => {
+                    expandSuggestionDetails();
+                    isProcessing = false;
+                }, 100);
+            }
+
+            // Function to force expand suggestion details
+            function expandSuggestionDetails() {
+                const suggestWidget = document.querySelector('.monaco-editor .suggest-widget');
+                if (suggestWidget && suggestWidget.style.display !== 'none') {
+
+                    // Add docs-side class for proper layout
+                    suggestWidget.classList.add('docs-side');
+
+                    // Force details to be visible
+                    const detailsElements = [
+                        '.monaco-editor .suggest-widget .details',
+                        '.monaco-editor .suggest-widget .suggest-details-container',
+                        '.monaco-editor .suggest-widget .suggest-details',
+                        '.monaco-editor .suggest-widget .suggest-details .body',
+                        '.monaco-editor .suggest-widget .suggest-details .header'
+                    ];
+
+                    detailsElements.forEach(selector => {
+                        const element = document.querySelector(selector);
+                        if (element) {
+                            element.style.display = 'block';
+                            element.style.visibility = 'visible';
+                            element.style.opacity = '1';
+                        }
+                    });
+
+                    // Get the suggest controller and try to show details programmatically
+                    const suggestController = editor.getContribution('editor.contrib.suggestController');
+                    if (suggestController && suggestController.widget && suggestController.widget.value) {
+                        const widget = suggestController.widget.value;
+
+                        // Try to access the details method
+                        if (widget.showDetails) {
+                            widget.showDetails();
+                        }
+
+                        // Force focus to the first suggestion to trigger details
+                        if (widget.selectFirst) {
+                            widget.selectFirst();
+                        }
+                    }
+                }
+            }
+
+            // Auto-trigger on cursor position changes
+            editor.onDidChangeCursorPosition((e) => {
+                const position = e.position;
+                const model = editor.getModel();
+                const lineContent = model.getLineContent(position.lineNumber);
+                const charBefore = lineContent.charAt(position.column - 2);
+                const charAtCursor = lineContent.charAt(position.column - 1);
+
+                // Auto-trigger if cursor is after 'h' or 'w' or if typing these letters
+                if (charBefore === 'h' || charBefore === 'w' || charAtCursor === 'h' || charAtCursor === 'w') {
+                    setTimeout(() => {
+                        autoTriggerAndExpand();
+                    }, 50);
+                }
+            });
+
+            // Auto-trigger on content changes (typing)
+            editor.onDidChangeModelContent((e) => {
+                if (e.changes.length > 0) {
+                    const change = e.changes[0];
+                    const text = change.text;
+
+                    // Auto-trigger if typing 'h' or 'w'
+                    if (text === 'h' || text === 'w') {
+                        setTimeout(() => {
+                            autoTriggerAndExpand();
+                        }, 100);
+                    }
+                }
+            });
+
+            // Monitor DOM for suggestion widget
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.type === 'childList' || mutation.type === 'attributes') {
+                        const suggestWidget = document.querySelector('.monaco-editor .suggest-widget');
+                        if (suggestWidget &&
+                            !suggestWidget.classList.contains('suggest-widget-loading') &&
+                            suggestWidget.style.display !== 'none') {
+
+                            setTimeout(() => {
+                                expandSuggestionDetails();
+                            }, 10);
+                        }
+                    }
+                });
+            });
+
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['style', 'class']
+            });
+
+            // Auto-resize editor on window resize
+            window.addEventListener('resize', () => {
+                editor.layout();
+            });
+
+            // Focus the editor and trigger initial suggestions
+            editor.focus();
+
+            // Position cursor after 'h' in the demo and auto-trigger
+            setTimeout(() => {
+                editor.setPosition({ lineNumber: 3, column: 2 });
+                autoTriggerAndExpand();
+            }, 500);
+        });
+    </script>
+</body>
+
+</html>
