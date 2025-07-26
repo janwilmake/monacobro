@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "styles": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9_-]+$": {
+          "type": "object",
+          "properties": {
+            "css": {
+              "type": "string",
+              "description": "CSS rules to apply to elements with this style"
+            }
+          },
+          "required": ["css"],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "patterns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "word": {
+            "type": "string",
+            "description": "The text pattern to match"
+          },
+          "style": {
+            "type": "string",
+            "description": "Reference to a style key defined in the styles object"
+          },
+          "info": {
+            "type": "string",
+            "description": "HTML content to display in hover tooltips"
+          },
+          "errorLabel": {
+            "type": "string",
+            "description": "Label for error correction quick fix"
+          },
+          "errorReplace": {
+            "type": "string",
+            "description": "Text to replace the pattern with when fixing errors"
+          },
+          "errorSeverity": {
+            "type": "string",
+            "enum": ["error", "warning", "info"],
+            "description": "Severity level for error markers"
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "format": "uri",
+                  "description": "URL to open when action is triggered"
+                },
+                "label": {
+                  "type": "string",
+                  "description": "Display label for the action"
+                },
+                "hover": {
+                  "type": "boolean",
+                  "description": "Whether this action should appear in hover tooltips"
+                },
+                "tooltip": {
+                  "type": "boolean",
+                  "description": "Whether to show tooltip for this action"
+                }
+              },
+              "required": ["url", "label"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["word", "style"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["styles", "patterns"],
+  "additionalProperties": false
+}
