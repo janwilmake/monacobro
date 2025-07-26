@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Pattern Monaco Editor</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin: 0;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        #container {
+            width: 100%;
+            height: 600px;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>🎯 Simple Pattern Editor</h1>
+        <p>JSON-driven Monaco enhancement</p>
+    </div>
+
+    <div id="container"></div>
+
+    <!-- Monaco Editor -->
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs/loader.js"></script>
+
+    <!-- Pattern Editor -->
+    <script src="monacobro.js"></script>
+
+    <!-- Data and Initialization -->
+    <script>
+        window.data = {
+            "content": `# Pattern Editor Demo
+
+I always recieve emails, but teh system is slow.
+Great work by @johndoe on the project!
+Check out: https://api.openai.com/v1/chat/completions
+We use **javascript** for development.
+
+WARNING: This is a warning message
+SUCCESS: Operation completed successfully  
+TODO: Add more examples`,
+            "styles": {
+                "spelling-error": {
+                    "css": "text-decoration: underline wavy red !important;",
+                },
+                "user-mention": {
+                    "css": "color: #1da1f2 !important; background: rgba(29,161,242,0.1) !important; padding: 1px 2px !important; border-radius: 3px !important;",
+                },
+                "api-endpoint": {
+                    "css": "color: #ff6b35 !important; text-decoration: underline !important;",
+                },
+                "token-count": {
+                    "css": "color: #ffa500 !important;",
+                },
+                "keyword-highlight": {
+                    "css": "color: #00ff88 !important; background: rgba(0,255,136,0.1) !important; padding: 1px 2px !important; border-radius: 3px !important;",
+                },
+                "warning": {
+                    "css": "background: rgba(255,193,7,0.2) !important; border-left: 3px solid #ffc107 !important; padding: 1px 4px !important;",
+                },
+                "success": {
+                    "css": "background: rgba(40,167,69,0.2) !important; border-left: 3px solid #28a745 !important; padding: 1px 4px !important;",
+                },
+                "info": {
+                    "css": "background: rgba(23,162,184,0.2) !important; border-left: 3px solid #17a2b8 !important; padding: 1px 4px !important;",
+                }
+            },
+            "patterns": [
+                {
+                    "word": "recieve",
+                    "style": "spelling-error",
+                    "errorLabel": "Fix to 'receive'",
+                    "errorReplace": "receive",
+                    "errorSeverity": "error"
+                },
+                {
+                    "word": "teh",
+                    "style": "spelling-error",
+                    "errorLabel": "Fix to 'the'",
+                    "errorReplace": "the",
+                    "errorSeverity": "error"
+                },
+                {
+                    "word": "@johndoe",
+                    "style": "user-mention",
+                    "info": "<strong>👤 John Doe</strong><br/>Software Developer<br/>📊 2.3K followers",
+                    "actions": [
+                        {
+                            "url": "https://twitter.com/johndoe",
+                            "label": "🐦 Open Twitter Profile",
+                            "hover": true
+                        },
+                        {
+                            "url": "https://linkedin.com/in/johndoe",
+                            "label": "💼 LinkedIn Profile",
+                            "hover": true
+                        },
+                        {
+                            "url": "https://github.com/johndoe",
+                            "label": "🐙 GitHub Profile",
+                            "hover": false,
+                            "tooltip": true
+                        }
+                    ]
+                },
+                {
+                    "word": "https://api.openai.com/v1/chat/completions",
+                    "style": "token-count",
+                    "info": "<strong>🌐 OpenAI Chat API</strong><br/>POST endpoint<br/>⚡ ~150 tokens",
+                    "actions": [
+                        {
+                            "url": "https://platform.openai.com/docs/api-reference/chat",
+                            "label": "📖 API Documentation",
+                            "hover": true
+                        },
+                        {
+                            "url": "https://platform.openai.com/playground",
+                            "label": "🎮 Try in Playground",
+                            "hover": true
+                        },
+                        {
+                            "url": "https://platform.openai.com/usage",
+                            "label": "📊 Usage Dashboard",
+                            "hover": false,
+                            "tooltip": true
+                        }
+                    ]
+                },
+                {
+                    "word": "javascript",
+                    "style": "keyword-highlight",
+                    "info": "<strong>📚 JavaScript</strong><br/>High-level programming language",
+                    "actions": [
+                        {
+                            "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript",
+                            "label": "📖 MDN Documentation",
+                            "hover": true
+                        },
+                        {
+                            "url": "https://www.javascript.com/",
+                            "label": "🌐 JavaScript.com",
+                            "hover": true
+                        }
+                    ]
+                },
+                {
+                    "word": "WARNING",
+                    "style": "warning",
+                    "info": "<strong>⚠️ Warning</strong><br/>Important notice that requires attention"
+                },
+                {
+                    "word": "SUCCESS",
+                    "style": "success",
+                    "info": "<strong>✅ Success</strong><br/>Operation completed successfully"
+                },
+                {
+                    "word": "TODO",
+                    "style": "info",
+                    "info": "<strong>ℹ️ Todo Item</strong><br/>Task that needs to be completed"
+                }
+            ]
+        };
+
+        // Initialize the editor
+        createPatternEditor('container', window.data);
+    </script>
+</body>
+
+</html>

@@ -47,6 +47,16 @@
     <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs/loader.js"></script>
     <script>
         const dataset = {
+            "content": `# Pattern Editor Demo
+
+I always recieve emails, but teh system is slow.
+Great work by @johndoe on the project!
+Check out: https://api.openai.com/v1/chat/completions
+We use **javascript** for development.
+
+WARNING: This is a warning message
+SUCCESS: Operation completed successfully  
+TODO: Add more examples`,
             "styles": {
                 "spelling-error": {
                     "css": "text-decoration: underline wavy red !important;",
@@ -191,16 +201,7 @@
             document.head.appendChild(style);
 
             const editor = monaco.editor.create(document.getElementById('container'), {
-                value: `# Pattern Editor Demo
-
-I always recieve emails, but teh system is slow.
-Great work by @johndoe on the project!
-Check out: https://api.openai.com/v1/chat/completions
-We use **javascript** for development.
-
-WARNING: This is a warning message
-SUCCESS: Operation completed successfully  
-TODO: Add more examples`,
+                value: dataset.content,
                 language: 'markdown',
                 theme: 'vs-dark',
                 automaticLayout: true,
@@ -261,7 +262,7 @@ TODO: Add more examples`,
 
             // Custom autocomplete provider
             disposables.push(monaco.languages.registerCompletionItemProvider('markdown', {
-                triggerCharacters: ['@', 'h', 't', 'r', 'j', 'W', 'S', 'T'], // First chars of patterns
+                triggerCharacters: [],
 
                 provideCompletionItems: (model, position, context) => {
                     const { currentText, range } = getWordAtPosition(model, position);
