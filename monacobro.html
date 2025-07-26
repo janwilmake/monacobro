@@ -10,7 +10,7 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
             padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #002ae2 0%, #78050f 100%);
             min-height: 100vh;
             color: white;
         }
@@ -38,8 +38,8 @@
 
 <body>
     <div class="header">
-        <h1>🎯 Simple Pattern Editor</h1>
-        <p>JSON-driven Monaco enhancement</p>
+        <h1>🎯 Monacobro.js</h1>
+        <p>JSON-driven Monaco Editor</p>
     </div>
 
     <div id="container"></div>
@@ -98,6 +98,13 @@ TODO: Add more examples`,
                     "errorSeverity": "error"
                 },
                 {
+                    "word": "fix-it.html",
+                    triggerCharacter: "`",
+                    triggerComplete: '`',
+                    "style": "code",
+                    info: "[fix-it.html](/fix-it.html) - 500 tokens"
+                },
+                {
                     "word": "teh",
                     "style": "spelling-error",
                     "errorLabel": "Fix to 'the'",
@@ -105,7 +112,8 @@ TODO: Add more examples`,
                     "errorSeverity": "error"
                 },
                 {
-                    "word": "@johndoe",
+                    "word": "johndoe",
+                    triggerCharacter: "@",
                     "style": "user-mention",
                     "info": "<strong>👤 John Doe</strong><br/>Software Developer<br/>📊 2.3K followers",
                     "actions": [
@@ -130,6 +138,7 @@ TODO: Add more examples`,
                 {
                     "word": "https://api.openai.com/v1/chat/completions",
                     "style": "token-count",
+                    triggerCharacter: "@",
                     "info": "<strong>🌐 OpenAI Chat API</strong><br/>POST endpoint<br/>⚡ ~150 tokens",
                     "actions": [
                         {

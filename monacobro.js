@@ -16,6 +16,13 @@ function createPatternEditor(containerId, dataset) {
     style.textContent = css;
     document.head.appendChild(style);
 
+    // Extract unique trigger characters from patterns
+    const triggerCharacters = [
+      ...new Set(
+        dataset.patterns.map((p) => p.triggerCharacter).filter(Boolean)
+      ),
+    ];
+
     const editor = monaco.editor.create(document.getElementById(containerId), {
       value: dataset.content,
       language: "markdown",
@@ -24,54 +31,68 @@ function createPatternEditor(containerId, dataset) {
       minimap: { enabled: false },
       wordWrap: "on",
       lightbulb: { enabled: true },
-      // Disable automatic link detection to prevent conflicts
       links: false,
-      // Enable suggestions
       suggest: {
         showIcons: true,
         showSnippets: true,
         showWords: true,
-        showKeywords: true,
+        preview: true,
+        snippetsPreventQuickSuggestions: false,
+        showIcons: true,
+        showInlineDetails: true,
         insertMode: "replace",
         filterGraceful: true,
-        snippetsPreventQuickSuggestions: false,
         localityBonus: true,
         shareSuggestSelections: false,
+      },
+      quickSuggestions: {
+        other: true,
+        comments: true,
+        strings: true,
       },
     });
 
     const disposables = [];
-    let currentDecorations = []; // Track current decorations
+    let currentDecorations = [];
 
-    // Helper function to get word at position with better boundary detection
-    function getWordAtPosition(model, position) {
+    // Helper function to get trigger context at position
+    function getTriggerContext(model, position) {
       const line = model.getLineContent(position.lineNumber);
-      const wordSeparators = /[\s\.,;:!?\(\)\[\]{}"'`~@#$%^&*+=|\\<>\/]/;
+      const beforeCursor = line.substring(0, position.column - 1);
 
-      let start = position.column - 1;
-      let end = position.column - 1;
+      // Find the last trigger character
+      let triggerChar = null;
+      let triggerIndex = -1;
 
-      // Find start of word
-      while (start > 0 && !wordSeparators.test(line[start - 1])) {
-        start--;
+      for (const char of triggerCharacters) {
+        const lastIndex = beforeCursor.lastIndexOf(char);
+        if (lastIndex > triggerIndex) {
+          triggerIndex = lastIndex;
+          triggerChar = char;
+        }
       }
 
-      // Find end of word
-      while (end < line.length && !wordSeparators.test(line[end])) {
-        end++;
+      if (triggerIndex === -1) {
+        return null;
       }
 
-      const word = line.substring(start, end);
-      const currentText = line.substring(start, position.column - 1);
+      // Get text after trigger character
+      const textAfterTrigger = beforeCursor.substring(triggerIndex + 1);
+
+      // Check if there's any whitespace after trigger (would break the word)
+      if (/\s/.test(textAfterTrigger)) {
+        return null;
+      }
 
       return {
-        word,
-        currentText,
+        triggerChar,
+        triggerIndex,
+        textAfterTrigger,
         range: {
           startLineNumber: position.lineNumber,
           endLineNumber: position.lineNumber,
-          startColumn: start + 1,
-          endColumn: end + 1,
+          startColumn: triggerIndex + 2, // +1 for 1-based, +1 to skip trigger char
+          endColumn: position.column,
         },
       };
     }
@@ -79,35 +100,32 @@ function createPatternEditor(containerId, dataset) {
     // Custom autocomplete provider
     disposables.push(
       monaco.languages.registerCompletionItemProvider("markdown", {
-        triggerCharacters: [],
+        triggerCharacters,
 
         provideCompletionItems: (model, position, context) => {
-          const { currentText, range } = getWordAtPosition(model, position);
-          const suggestions = [];
+          const triggerContext = getTriggerContext(model, position);
 
-          // Always show suggestions if manually triggered or if we have matching text
-          const showSuggestions =
-            context.triggerKind ===
-              monaco.languages.CompletionTriggerKind.Invoke ||
-            currentText.length > 0;
-
-          if (!showSuggestions) {
+          if (!triggerContext) {
             return { suggestions: [] };
           }
 
-          // Find matching patterns
-          dataset.patterns.forEach((pattern, index) => {
-            // Match if:
-            // 1. Manual trigger (Ctrl+Space)
-            // 2. Pattern starts with current text
-            // 3. Pattern contains current text (for partial matches)
+          const { triggerChar, textAfterTrigger, range } = triggerContext;
+          const suggestions = [];
+
+          // Only show patterns that match the current trigger character
+          const matchingPatterns = dataset.patterns.filter(
+            (pattern) => pattern.triggerCharacter === triggerChar
+          );
+
+          matchingPatterns.forEach((pattern, index) => {
+            // Match if pattern word starts with text after trigger
+            const patternWord = pattern.word || "";
             const isMatch =
-              currentText.length === 0 ||
-              pattern.word
-                .toLowerCase()
-                .startsWith(currentText.toLowerCase()) ||
-              (currentText.length >= 2 &&
-                pattern.word.toLowerCase().includes(currentText.toLowerCase()));
+              (textAfterTrigger.length === 0 ||
+                patternWord
+                  .toLowerCase()
+                  .startsWith(textAfterTrigger.toLowerCase())) &&
+              patternWord !== textAfterTrigger;
 
             if (isMatch) {
               // Extract plain text from HTML for detail display
@@ -118,31 +136,35 @@ function createPatternEditor(containerId, dataset) {
 
               suggestions.push({
                 label: {
-                  label: pattern.word,
-                  detail: lines.length > 1 ? lines[1] : "", // Second line as detail
-                  description: lines.length > 2 ? lines.slice(2).join(" ") : "", // Rest as description
+                  label: patternWord,
+                  detail: lines.length > 1 ? lines[1] : "",
+                  description: lines.length > 2 ? lines.slice(2).join(" ") : "",
                 },
                 kind: monaco.languages.CompletionItemKind.Text,
-                insertText: pattern.word,
+                insertText: patternWord,
                 range,
                 documentation: {
-                  value: pattern.info || pattern.word,
+                  value: pattern.info || patternWord,
                   isTrusted: true,
                 },
                 sortText: String(index).padStart(3, "0"),
-                filterText: pattern.word,
+                filterText: patternWord,
                 preselect:
-                  currentText.length > 0 &&
-                  pattern.word
+                  textAfterTrigger.length > 0 &&
+                  patternWord
                     .toLowerCase()
-                    .startsWith(currentText.toLowerCase()),
+                    .startsWith(textAfterTrigger.toLowerCase()),
+                command: {
+                  id: "editor.action.showHover",
+                  title: "Show Details",
+                },
               });
             }
           });
 
           return {
             suggestions,
-            incomplete: currentText.length > 0 && suggestions.length === 0, // Keep searching if no matches yet
+            incomplete: false,
           };
         },
       })
@@ -155,21 +177,25 @@ function createPatternEditor(containerId, dataset) {
       typingTimer = setTimeout(() => {
         const position = editor.getPosition();
         const model = editor.getModel();
-        const { currentText } = getWordAtPosition(model, position);
+        const triggerContext = getTriggerContext(model, position);
 
-        // Trigger if we have text and it could match a pattern
-        if (currentText.length > 0) {
-          const hasMatches = dataset.patterns.some(
+        // Trigger if we have a valid trigger context
+        if (triggerContext && triggerContext.textAfterTrigger.length > 0) {
+          const matchingPatterns = dataset.patterns.filter(
             (pattern) =>
-              pattern.word
+              pattern.triggerCharacter === triggerContext.triggerChar &&
+              (pattern.word || "")
                 .toLowerCase()
-                .startsWith(currentText.toLowerCase()) ||
-              (currentText.length >= 2 &&
-                pattern.word.toLowerCase().includes(currentText.toLowerCase()))
+                .startsWith(triggerContext.textAfterTrigger.toLowerCase()) &&
+              (pattern.word || "") !== triggerContext.textAfterTrigger
           );
 
-          if (hasMatches) {
+          if (matchingPatterns.length > 0) {
             editor.trigger("auto", "editor.action.triggerSuggest", {});
+
+            setTimeout(() => {
+              editor.trigger("auto", "toggleSuggestionDetails", {});
+            }, 50);
           }
         }
 
@@ -181,33 +207,40 @@ function createPatternEditor(containerId, dataset) {
     // Manual trigger with Ctrl+Space
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Space, () => {
       editor.trigger("manual", "editor.action.triggerSuggest", {});
+      setTimeout(() => {
+        editor.trigger("auto", "toggleSuggestionDetails", {});
+      }, 50);
     });
 
-    // Enhanced hover provider with multiple actions support
+    // Enhanced hover provider
     disposables.push(
       monaco.languages.registerHoverProvider("markdown", {
         provideHover: (model, position) => {
           const line = model.getLineContent(position.lineNumber);
 
           for (const pattern of dataset.patterns) {
-            const index = line.indexOf(pattern.word);
+            if (!pattern.word) continue;
+
+            // Look for trigger + word pattern
+            const searchPattern =
+              (pattern.triggerCharacter || "") + pattern.word;
+            const index = line.indexOf(searchPattern);
+
             if (index !== -1) {
               const start = index + 1;
-              const end = start + pattern.word.length;
+              const end = start + searchPattern.length;
 
               if (position.column >= start && position.column <= end) {
                 const contents = [];
 
-                // Add main info if it exists
                 if (pattern.info) {
                   contents.push({ value: pattern.info, supportHtml: true });
                 }
 
-                // Add hover-enabled actions
                 if (pattern.actions) {
                   pattern.actions
                     .filter((action) => action.hover)
-                    .map((action) => {
+                    .forEach((action) => {
                       contents.push({
                         value: `[${action.label}](${action.url})`,
                         isTrusted: true,
@@ -233,7 +266,7 @@ function createPatternEditor(containerId, dataset) {
       })
     );
 
-    // Enhanced link provider with multiple actions support
+    // Enhanced link provider
     disposables.push(
       monaco.languages.registerLinkProvider("markdown", {
         provideLinks: (model) => {
@@ -242,22 +275,22 @@ function createPatternEditor(containerId, dataset) {
 
           lines.forEach((line, lineIndex) => {
             dataset.patterns.forEach((pattern) => {
+              if (!pattern.word) return;
+
+              const searchPattern =
+                (pattern.triggerCharacter || "") + pattern.word;
               let searchStart = 0;
               let index;
 
-              // Find all occurrences of the pattern in the line
-              while ((index = line.indexOf(pattern.word, searchStart)) !== -1) {
+              while (
+                (index = line.indexOf(searchPattern, searchStart)) !== -1
+              ) {
                 const lineNumber = lineIndex + 1;
                 const start = index + 1;
-                const end = start + pattern.word.length;
+                const end = start + searchPattern.length;
 
-                // Handle new actions array format
                 if (pattern.actions) {
-                  // For now, use the first action for the primary link
-                  // In a real implementation, you might want to show a context menu
-                  const primaryAction = pattern.actions[0];
-
-                  pattern.actions.map((action) => {
+                  pattern.actions.forEach((action) => {
                     links.push({
                       range: new monaco.Range(
                         lineNumber,
@@ -266,7 +299,7 @@ function createPatternEditor(containerId, dataset) {
                         end
                       ),
                       url: action.url,
-                      tooltip: action.tooltip ? action.label : undefined,
+                      tooltip: action.tooltip || action.label,
                     });
                   });
                 }
@@ -289,12 +322,14 @@ function createPatternEditor(containerId, dataset) {
           const actions = [];
 
           dataset.patterns.forEach((pattern) => {
-            // Check if pattern has error replacement
-            if (pattern.errorReplace && pattern.errorLabel) {
-              const index = line.indexOf(pattern.word);
+            if (pattern.errorReplace && pattern.errorLabel && pattern.word) {
+              const searchPattern =
+                (pattern.triggerCharacter || "") + pattern.word;
+              const index = line.indexOf(searchPattern);
+
               if (index !== -1) {
                 const start = index + 1;
-                const end = start + pattern.word.length;
+                const end = start + searchPattern.length;
 
                 if (range.startColumn >= start && range.endColumn <= end) {
                   actions.push({
@@ -327,7 +362,7 @@ function createPatternEditor(containerId, dataset) {
       })
     );
 
-    // Enhanced code lens with multiple actions support
+    // Enhanced code lens
     disposables.push(
       monaco.languages.registerCodeLensProvider("markdown", {
         provideCodeLenses: (model) => {
@@ -335,20 +370,23 @@ function createPatternEditor(containerId, dataset) {
           const lenses = [];
 
           lines.forEach((line, lineIndex) => {
-            dataset.patterns.forEach((pattern, patternIndex) => {
-              const index = line.indexOf(pattern.word);
+            dataset.patterns.forEach((pattern) => {
+              if (!pattern.word) return;
+
+              const searchPattern =
+                (pattern.triggerCharacter || "") + pattern.word;
+              const index = line.indexOf(searchPattern);
+
               if (index !== -1) {
                 const range = {
                   startLineNumber: lineIndex + 1,
                   startColumn: index + 1,
                   endLineNumber: lineIndex + 1,
-                  endColumn: index + pattern.word.length + 1,
+                  endColumn: index + searchPattern.length + 1,
                 };
 
-                // Handle new actions array format
                 if (pattern.actions && pattern.actions.length > 0) {
-                  // Create a lens for each action, or combine them
-                  pattern.actions.forEach((action, actionIndex) => {
+                  pattern.actions.forEach((action) => {
                     if (action.tooltip) {
                       lenses.push({
                         range,
@@ -393,14 +431,16 @@ function createPatternEditor(containerId, dataset) {
         if (inCodeBlock) return;
 
         dataset.patterns.forEach((pattern) => {
+          if (!pattern.word) return;
+
+          const searchPattern = (pattern.triggerCharacter || "") + pattern.word;
           let searchStart = 0;
           let index;
 
-          // Find all occurrences of the pattern in the line
-          while ((index = line.indexOf(pattern.word, searchStart)) !== -1) {
+          while ((index = line.indexOf(searchPattern, searchStart)) !== -1) {
             const lineNumber = lineIndex + 1;
             const start = index + 1;
-            const end = start + pattern.word.length;
+            const end = start + searchPattern.length;
 
             // Apply main decoration
             decorations.push({
@@ -422,7 +462,7 @@ function createPatternEditor(containerId, dataset) {
                 startColumn: start,
                 endLineNumber: lineNumber,
                 endColumn: end,
-                message: pattern.errorLabel || `Issue with: ${pattern.word}`,
+                message: pattern.errorLabel || `Issue with: ${searchPattern}`,
                 severity: severity,
               });
             }
@@ -432,7 +472,6 @@ function createPatternEditor(containerId, dataset) {
         });
       });
 
-      // Properly clear old decorations before applying new ones
       currentDecorations = editor.deltaDecorations(
         currentDecorations,
         decorations
