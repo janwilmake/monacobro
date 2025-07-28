@@ -4,7 +4,172 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Pattern Monaco Editor</title>
+    <title>Monaco Editor - Comprehensive Auto-Expanded Suggestions</title>
+
+    <script type="application/json" id="monacobro-data">
+    {
+        "content": "# Comprehensive Pattern Editor Demo\n\nI always recieve emails, but teh system is slow.\nGreat work by @johndoe on the project!\nCheck out: https://api.openai.com/v1/chat/completions\nWe use **javascript** for development.\n\nTry typing after these triggers:\n@j (for @johndoe)\nh (for hello)\nw (for world)\nj (for javascript)\n\nWARNING: This is a warning message\nSUCCESS: Operation completed successfully  \nTODO: Add more examples with auto-expanded details\n\nPosition cursor after any letter and see auto-expanded suggestions!",
+        "styles": {
+            "spelling-error": {
+                "css": "text-decoration: underline wavy red !important;"
+            },
+            "user-mention": {
+                "css": "color: #1da1f2 !important; background: rgba(29,161,242,0.1) !important; padding: 1px 2px !important; border-radius: 3px !important;"
+            },
+            "api-endpoint": {
+                "css": "color: #ff6b35 !important; text-decoration: underline !important;"
+            },
+            "token-count": {
+                "css": "color: #ffa500 !important;"
+            },
+            "keyword-highlight": {
+                "css": "color: #00ff88 !important; background: rgba(0,255,136,0.1) !important; padding: 1px 2px !important; border-radius: 3px !important;"
+            },
+            "greeting": {
+                "css": "color: #ff69b4 !important; background: rgba(255,105,180,0.1) !important; padding: 1px 2px !important; border-radius: 3px !important;"
+            },
+            "world": {
+                "css": "color: #32cd32 !important; background: rgba(50,205,50,0.1) !important; padding: 1px 2px !important; border-radius: 3px !important;"
+            },
+            "warning": {
+                "css": "background: rgba(255,193,7,0.2) !important; border-left: 3px solid #ffc107 !important; padding: 1px 4px !important;"
+            },
+            "success": {
+                "css": "background: rgba(40,167,69,0.2) !important; border-left: 3px solid #28a745 !important; padding: 1px 4px !important;"
+            },
+            "info": {
+                "css": "background: rgba(23,162,184,0.2) !important; border-left: 3px solid #17a2b8 !important; padding: 1px 4px !important;"
+            }
+        },
+        "patterns": [
+            {
+                "word": "hello",
+                "style": "greeting",
+                "inlay": "👋 greeting",
+                "info": "<strong>🎉 Hello</strong> - A friendly greeting<br/><br/><strong>Usage Examples:</strong><br/>• \"Hello, world!\" - The classic programming greeting<br/>• \"Hello there!\" - A casual greeting<br/>• \"Hello everyone\" - Group greeting<br/><br/><strong>Etymology:</strong> From Old English \"hǣl\" meaning \"whole\" or \"healthy\"<br/><br/><strong>Related Phrases:</strong><br/>• Hello darkness, my old friend<br/>• Hello from the other side<br/>• Say hello to my little friend<br/><br/><strong>Programming Context:</strong><br/>The \"Hello, World!\" program is traditionally the first program written by students learning a new programming language.<br/><br/><strong>Cultural Impact:</strong><br/>Used in over 200 programming languages as the introductory example.",
+                "actions": [
+                    {
+                        "url": "https://en.wikipedia.org/wiki/%22Hello,_World!%22_program",
+                        "label": "📖 Wikipedia: Hello World",
+                        "hover": true
+                    }
+                ]
+            },
+            {
+                "word": "world",
+                "style": "world",
+                "inlay": "🌍 planet",
+                "info": "<strong>🌍 World</strong> - The Earth and all its inhabitants<br/><br/><strong>Common Phrases:</strong><br/>• \"Hello, world!\" - Programming tradition<br/>• \"World peace\" - Global harmony<br/>• \"Around the world\" - Global journey<br/>• \"World wide web\" - The internet<br/><br/><strong>Related Terms:</strong> planet, earth, globe, universe, cosmos<br/><br/><strong>Fun Facts:</strong><br/>• The \"Hello, World!\" program tradition started in 1972<br/>• World population is over 8 billion people<br/>• There are 195 countries in the world<br/>• Earth is 4.54 billion years old<br/><br/><strong>In Different Languages:</strong><br/>• Spanish: mundo<br/>• French: monde<br/>• German: Welt<br/>• Japanese: 世界 (sekai)<br/><br/><strong>Geography:</strong><br/>Surface area: 510.1 million km²<br/>Oceans cover 71% of the surface",
+                "actions": [
+                    {
+                        "url": "https://en.wikipedia.org/wiki/World",
+                        "label": "🌐 Wikipedia: World",
+                        "hover": true
+                    }
+                ]
+            },
+            {
+                "word": "recieve",
+                "style": "spelling-error",
+                "inlay": "❌ typo",
+                "errorLabel": "Fix to 'receive'",
+                "errorReplace": "receive",
+                "errorSeverity": "error",
+                "info": "<strong>❌ Spelling Error</strong><br/><br/><strong>Correct spelling:</strong> receive<br/><strong>Common mistake:</strong> \"i before e\" rule confusion<br/><br/><strong>Memory tip:</strong> \"I before E, except after C, or when sounded like A as in neighbor and weigh\"<br/><br/><strong>Other examples:</strong><br/>• achieve, believe, field, piece<br/>• deceive, perceive, ceiling, receipt"
+            },
+            {
+                "word": "teh",
+                "style": "spelling-error",
+                "inlay": "❌ typo",
+                "errorLabel": "Fix to 'the'",
+                "errorReplace": "the",
+                "errorSeverity": "error",
+                "info": "<strong>❌ Typo</strong><br/><br/><strong>Correct spelling:</strong> the<br/><strong>Common typing error:</strong> Transposed letters<br/><br/><strong>Prevention tips:</strong><br/>• Slow down when typing common words<br/>• Use spell check tools<br/>• Practice typing accuracy"
+            },
+            {
+                "word": "johndoe",
+                "triggerCharacter": "@",
+                "triggerComplete": "@johndoe",
+                "style": "user-mention",
+                "inlay": "👤 developer",
+                "info": "<strong>👤 John Doe</strong><br/>Software Developer<br/>📊 2.3K followers<br/><br/><strong>Expertise:</strong><br/>• Full-stack development<br/>• React & Node.js<br/>• Cloud architecture<br/><br/><strong>Recent Activity:</strong><br/>• Contributed to 15 repositories this month<br/>• Published 3 articles on Medium<br/>• Spoke at TechConf 2024",
+                "actions": [
+                    {
+                        "url": "https://twitter.com/johndoe",
+                        "label": "🐦 Twitter Profile",
+                        "hover": true
+                    },
+                    {
+                        "url": "https://linkedin.com/in/johndoe",
+                        "label": "💼 LinkedIn Profile",
+                        "hover": true
+                    },
+                    {
+                        "url": "https://github.com/johndoe",
+                        "label": "🐙 GitHub Profile",
+                        "hover": false,
+                        "tooltip": true
+                    }
+                ]
+            },
+            {
+                "word": "https://api.openai.com/v1/chat/completions",
+                "style": "api-endpoint",
+                "inlay": "🌐 API",
+                "info": "<strong>🌐 OpenAI Chat Completions API</strong><br/><br/><strong>Endpoint Details:</strong><br/>• Method: POST<br/>• Authentication: Bearer token required<br/>• Rate limits apply<br/><br/><strong>Common Parameters:</strong><br/>• model: gpt-3.5-turbo, gpt-4<br/>• messages: Array of conversation messages<br/>• temperature: 0.0-2.0 (creativity level)<br/>• max_tokens: Response length limit<br/><br/><strong>Pricing:</strong><br/>• GPT-3.5-turbo: $0.002/1K tokens<br/>• GPT-4: $0.03/1K tokens (input)<br/><br/><strong>Response Format:</strong><br/>Returns JSON with choices array containing generated text",
+                "actions": [
+                    {
+                        "url": "https://platform.openai.com/docs/api-reference/chat",
+                        "label": "📖 API Documentation",
+                        "hover": true
+                    },
+                    {
+                        "url": "https://platform.openai.com/playground",
+                        "label": "🎮 Try in Playground",
+                        "hover": true
+                    }
+                ]
+            },
+            {
+                "word": "javascript",
+                "style": "keyword-highlight",
+                "inlay": "📚 language",
+                "info": "<strong>📚 JavaScript</strong><br/>High-level, interpreted programming language<br/><br/><strong>Key Features:</strong><br/>• Dynamic typing<br/>• First-class functions<br/>• Prototype-based OOP<br/>• Event-driven programming<br/><br/><strong>Popular Frameworks:</strong><br/>• React, Vue, Angular (Frontend)<br/>• Node.js, Express (Backend)<br/>• React Native, Electron (Mobile/Desktop)<br/><br/><strong>Latest Features (ES2024):</strong><br/>• Array grouping methods<br/>• Promise.withResolvers()<br/>• Temporal API (proposal)<br/><br/><strong>Performance Tips:</strong><br/>• Use const/let instead of var<br/>• Minimize DOM manipulation<br/>• Leverage async/await for better readability",
+                "actions": [
+                    {
+                        "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript",
+                        "label": "📖 MDN Documentation",
+                        "hover": true
+                    },
+                    {
+                        "url": "https://www.ecma-international.org/ecma-262/",
+                        "label": "📋 ECMAScript Specification",
+                        "hover": true
+                    }
+                ]
+            },
+            {
+                "word": "WARNING",
+                "style": "warning",
+                "inlay": "⚠️ alert",
+                "info": "<strong>⚠️ Warning</strong><br/>Important notice that requires attention<br/><br/><strong>When to use:</strong><br/>• Potential data loss scenarios<br/>• Performance implications<br/>• Security considerations<br/>• Deprecated features<br/><br/><strong>Best practices:</strong><br/>• Be specific about the risk<br/>• Provide actionable solutions<br/>• Use appropriate visual indicators"
+            },
+            {
+                "word": "SUCCESS",
+                "style": "success",
+                "inlay": "✅ status",
+                "info": "<strong>✅ Success</strong><br/>Operation completed successfully<br/><br/><strong>Typical scenarios:</strong><br/>• Data saved successfully<br/>• Tests passed<br/>• Deployment completed<br/>• User registration confirmed<br/><br/><strong>UX considerations:</strong><br/>• Provide clear confirmation<br/>• Show next steps if applicable<br/>• Consider auto-dismissing after delay"
+            },
+            {
+                "word": "TODO",
+                "style": "info",
+                "inlay": "ℹ️ task",
+                "info": "<strong>ℹ️ Todo Item</strong><br/>Task that needs to be completed<br/><br/><strong>Best practices:</strong><br/>• Be specific and actionable<br/>• Include priority levels<br/>• Set deadlines where appropriate<br/>• Assign responsibility<br/><br/><strong>Common formats:</strong><br/>• TODO: Fix bug in user authentication<br/>• FIXME: Optimize database query performance<br/>• HACK: Temporary workaround for API issue"
+            }
+        ]
+    }
+    </script>
+
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -38,165 +203,14 @@
 
 <body>
     <div class="header">
-        <h1>🎯 Monacobro.js</h1>
-        <p>JSON-driven Monaco Editor</p>
+        <h1>🎯 Monaco Comprehensive Auto-Expanded</h1>
+        <p>Full-featured auto-expanding suggestions with hover, lens, decorations, and inlay hints</p>
     </div>
 
-    <div id="container"></div>
-
-    <!-- Monaco Editor -->
-    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs/loader.js"></script>
-
-    <!-- Pattern Editor -->
+    <!-- <script type="application/json" id="monacobro-data">{"content":string, "styles": {[key:string]:{css:string}}, "patterns": Pattern[]}</script> -->
+    <div id="monacobro-container"></div>
+    <script src="https://unpkg.com/monaco-editor@0.44.0/min/vs/loader.js"></script>
     <script src="monacobro.js"></script>
-
-    <!-- Data and Initialization -->
-    <script>
-        window.data = {
-            "content": `# Pattern Editor Demo
-
-I always recieve emails, but teh system is slow.
-Great work by @johndoe on the project!
-Check out: https://api.openai.com/v1/chat/completions
-We use **javascript** for development.
-
-WARNING: This is a warning message
-SUCCESS: Operation completed successfully  
-TODO: Add more examples`,
-            "styles": {
-                "spelling-error": {
-                    "css": "text-decoration: underline wavy red !important;",
-                },
-                "user-mention": {
-                    "css": "color: #1da1f2 !important; background: rgba(29,161,242,0.1) !important; padding: 1px 2px !important; border-radius: 3px !important;",
-                },
-                "api-endpoint": {
-                    "css": "color: #ff6b35 !important; text-decoration: underline !important;",
-                },
-                "token-count": {
-                    "css": "color: #ffa500 !important;",
-                },
-                "keyword-highlight": {
-                    "css": "color: #00ff88 !important; background: rgba(0,255,136,0.1) !important; padding: 1px 2px !important; border-radius: 3px !important;",
-                },
-                "warning": {
-                    "css": "background: rgba(255,193,7,0.2) !important; border-left: 3px solid #ffc107 !important; padding: 1px 4px !important;",
-                },
-                "success": {
-                    "css": "background: rgba(40,167,69,0.2) !important; border-left: 3px solid #28a745 !important; padding: 1px 4px !important;",
-                },
-                "info": {
-                    "css": "background: rgba(23,162,184,0.2) !important; border-left: 3px solid #17a2b8 !important; padding: 1px 4px !important;",
-                }
-            },
-            "patterns": [
-                {
-                    "word": "recieve",
-                    "style": "spelling-error",
-                    "errorLabel": "Fix to 'receive'",
-                    "errorReplace": "receive",
-                    "errorSeverity": "error"
-                },
-                {
-                    "word": "fix-it.html",
-                    triggerCharacter: "`",
-                    triggerComplete: '`',
-                    "style": "code",
-                    info: "[fix-it.html](/fix-it.html) - 500 tokens"
-                },
-                {
-                    "word": "teh",
-                    "style": "spelling-error",
-                    "errorLabel": "Fix to 'the'",
-                    "errorReplace": "the",
-                    "errorSeverity": "error"
-                },
-                {
-                    "word": "johndoe",
-                    triggerCharacter: "@",
-                    "style": "user-mention",
-                    "info": "<strong>👤 John Doe</strong><br/>Software Developer<br/>📊 2.3K followers",
-                    "actions": [
-                        {
-                            "url": "https://twitter.com/johndoe",
-                            "label": "🐦 Open Twitter Profile",
-                            "hover": true
-                        },
-                        {
-                            "url": "https://linkedin.com/in/johndoe",
-                            "label": "💼 LinkedIn Profile",
-                            "hover": true
-                        },
-                        {
-                            "url": "https://github.com/johndoe",
-                            "label": "🐙 GitHub Profile",
-                            "hover": false,
-                            "tooltip": true
-                        }
-                    ]
-                },
-                {
-                    "word": "https://api.openai.com/v1/chat/completions",
-                    "style": "token-count",
-                    triggerCharacter: "@",
-                    "info": "<strong>🌐 OpenAI Chat API</strong><br/>POST endpoint<br/>⚡ ~150 tokens",
-                    "actions": [
-                        {
-                            "url": "https://platform.openai.com/docs/api-reference/chat",
-                            "label": "📖 API Documentation",
-                            "hover": true
-                        },
-                        {
-                            "url": "https://platform.openai.com/playground",
-                            "label": "🎮 Try in Playground",
-                            "hover": true
-                        },
-                        {
-                            "url": "https://platform.openai.com/usage",
-                            "label": "📊 Usage Dashboard",
-                            "hover": false,
-                            "tooltip": true
-                        }
-                    ]
-                },
-                {
-                    "word": "javascript",
-                    "style": "keyword-highlight",
-                    "info": "<strong>📚 JavaScript</strong><br/>High-level programming language",
-                    "actions": [
-                        {
-                            "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript",
-                            "label": "📖 MDN Documentation",
-                            "hover": true
-                        },
-                        {
-                            "url": "https://www.javascript.com/",
-                            "label": "🌐 JavaScript.com",
-                            "hover": true
-                        }
-                    ]
-                },
-                {
-                    "word": "WARNING",
-                    "style": "warning",
-                    "info": "<strong>⚠️ Warning</strong><br/>Important notice that requires attention"
-                },
-                {
-                    "word": "SUCCESS",
-                    "style": "success",
-                    "info": "<strong>✅ Success</strong><br/>Operation completed successfully"
-                },
-                {
-                    "word": "TODO",
-                    "style": "info",
-                    "info": "<strong>ℹ️ Todo Item</strong><br/>Task that needs to be completed"
-                }
-            ]
-        };
-
-        // Initialize the editor
-        createPatternEditor('container', window.data);
-    </script>
 </body>
 
 </html>

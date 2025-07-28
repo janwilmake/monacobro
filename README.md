@@ -1,8 +1,22 @@
-TODO:
+# Monacobro.js
 
-Make `monacobro.js` good
+Serializable Monaco.js Loader from backend data
 
-Check https://microsoft.github.io/monaco-editor/playground.html
+Usage
 
-- inlay hints are pretty cool! should add
-- see if i can fix opening intellisense details by default in proper height https://github.com/microsoft/monaco-editor/issues/2241. SOLUTION: https://letmeprompt.com/rules-httpsuithu-3m1p4v0?key=result
+```html
+<!-- Your Data here -->
+<script type="application/json" id="monacobro-data">
+  {"content":string, "styles": {[key:string]:{css:string}}, "patterns": Pattern[]}
+</script>
+<!-- Your monaco editor will appear here -->
+<div id="monacobro-container"></div>
+<script src="https://unpkg.com/monaco-editor@0.44.0/min/vs/loader.js"></script>
+<script src="https://monacobro.com/monacobro.js"></script>
+```
+
+> ![WARNING]
+>
+> This module will have breaking changes so it's best practice to copy/paste the script into your own production environment.
+
+# TODO

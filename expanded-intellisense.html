@@ -24,47 +24,6 @@
             color: #cccccc;
             margin-bottom: 20px;
         }
-
-        /* Force suggestion details to be visible and expanded */
-        .monaco-editor .suggest-widget .details {
-            display: block !important;
-            opacity: 1 !important;
-            visibility: visible !important;
-            width: 350px !important;
-            min-height: 200px !important;
-        }
-
-        .monaco-editor .suggest-widget.docs-side {
-            width: auto !important;
-        }
-
-        .monaco-editor .suggest-widget .suggest-details-container {
-            display: block !important;
-            width: 350px !important;
-            min-height: 200px !important;
-        }
-
-        .monaco-editor .suggest-widget .suggest-details {
-            display: block !important;
-            width: 100% !important;
-            min-height: 200px !important;
-        }
-
-        /* Ensure the suggestion widget is wide enough */
-        .monaco-editor .suggest-widget {
-            width: auto !important;
-            min-width: 700px !important;
-        }
-
-        /* Make sure the docs are always visible */
-        .monaco-editor .suggest-widget .suggest-details .header {
-            display: block !important;
-        }
-
-        .monaco-editor .suggest-widget .suggest-details .body {
-            display: block !important;
-            min-height: 150px !important;
-        }
     </style>
 </head>
 
@@ -145,26 +104,6 @@ Type more letters to see the auto-complete in action:
                 wordWrap: 'on',
                 minimap: { enabled: false },
                 scrollBeyondLastLine: false,
-                suggest: {
-                    showKeywords: true,
-                    showSnippets: true,
-                    showWords: true,
-                    insertMode: 'replace',
-                    filterGraceful: true,
-                    snippetsPreventQuickSuggestions: false,
-                    localityBonus: true,
-                    shareSuggestSelections: true,
-                    showIcons: true,
-                    showStatusBar: true,
-                    preview: true,
-                    previewMode: 'prefix',
-                    showDetails: true
-                },
-                quickSuggestions: {
-                    other: true,
-                    comments: true,
-                    strings: true
-                },
                 suggestOnTriggerCharacters: true,
                 acceptSuggestionOnCommitCharacter: true,
                 acceptSuggestionOnEnter: 'on',
@@ -173,119 +112,7 @@ Type more letters to see the auto-complete in action:
 
             let isProcessing = false;
 
-            // Function to auto-trigger suggestions and expand details
-            function autoTriggerAndExpand() {
-                if (isProcessing) return;
-                isProcessing = true;
 
-                // Trigger suggestions
-                editor.trigger('auto', 'editor.action.triggerSuggest', {});
-
-                // Wait for suggestions to appear and then expand them
-                setTimeout(() => {
-                    expandSuggestionDetails();
-                    isProcessing = false;
-                }, 100);
-            }
-
-            // Function to force expand suggestion details
-            function expandSuggestionDetails() {
-                const suggestWidget = document.querySelector('.monaco-editor .suggest-widget');
-                if (suggestWidget && suggestWidget.style.display !== 'none') {
-
-                    // Add docs-side class for proper layout
-                    suggestWidget.classList.add('docs-side');
-
-                    // Force details to be visible
-                    const detailsElements = [
-                        '.monaco-editor .suggest-widget .details',
-                        '.monaco-editor .suggest-widget .suggest-details-container',
-                        '.monaco-editor .suggest-widget .suggest-details',
-                        '.monaco-editor .suggest-widget .suggest-details .body',
-                        '.monaco-editor .suggest-widget .suggest-details .header'
-                    ];
-
-                    detailsElements.forEach(selector => {
-                        const element = document.querySelector(selector);
-                        if (element) {
-                            element.style.display = 'block';
-                            element.style.visibility = 'visible';
-                            element.style.opacity = '1';
-                        }
-                    });
-
-                    // Get the suggest controller and try to show details programmatically
-                    const suggestController = editor.getContribution('editor.contrib.suggestController');
-                    if (suggestController && suggestController.widget && suggestController.widget.value) {
-                        const widget = suggestController.widget.value;
-
-                        // Try to access the details method
-                        if (widget.showDetails) {
-                            widget.showDetails();
-                        }
-
-                        // Force focus to the first suggestion to trigger details
-                        if (widget.selectFirst) {
-                            widget.selectFirst();
-                        }
-                    }
-                }
-            }
-
-            // Auto-trigger on cursor position changes
-            editor.onDidChangeCursorPosition((e) => {
-                const position = e.position;
-                const model = editor.getModel();
-                const lineContent = model.getLineContent(position.lineNumber);
-                const charBefore = lineContent.charAt(position.column - 2);
-                const charAtCursor = lineContent.charAt(position.column - 1);
-
-                // Auto-trigger if cursor is after 'h' or 'w' or if typing these letters
-                if (charBefore === 'h' || charBefore === 'w' || charAtCursor === 'h' || charAtCursor === 'w') {
-                    setTimeout(() => {
-                        autoTriggerAndExpand();
-                    }, 50);
-                }
-            });
-
-            // Auto-trigger on content changes (typing)
-            editor.onDidChangeModelContent((e) => {
-                if (e.changes.length > 0) {
-                    const change = e.changes[0];
-                    const text = change.text;
-
-                    // Auto-trigger if typing 'h' or 'w'
-                    if (text === 'h' || text === 'w') {
-                        setTimeout(() => {
-                            autoTriggerAndExpand();
-                        }, 100);
-                    }
-                }
-            });
-
-            // Monitor DOM for suggestion widget
-            const observer = new MutationObserver((mutations) => {
-                mutations.forEach((mutation) => {
-                    if (mutation.type === 'childList' || mutation.type === 'attributes') {
-                        const suggestWidget = document.querySelector('.monaco-editor .suggest-widget');
-                        if (suggestWidget &&
-                            !suggestWidget.classList.contains('suggest-widget-loading') &&
-                            suggestWidget.style.display !== 'none') {
-
-                            setTimeout(() => {
-                                expandSuggestionDetails();
-                            }, 10);
-                        }
-                    }
-                });
-            });
-
-            observer.observe(document.body, {
-                childList: true,
-                subtree: true,
-                attributes: true,
-                attributeFilter: ['style', 'class']
-            });
 
             // Auto-resize editor on window resize
             window.addEventListener('resize', () => {
@@ -295,11 +122,10 @@ Type more letters to see the auto-complete in action:
             // Focus the editor and trigger initial suggestions
             editor.focus();
 
-            // Position cursor after 'h' in the demo and auto-trigger
-            setTimeout(() => {
-                editor.setPosition({ lineNumber: 3, column: 2 });
-                autoTriggerAndExpand();
-            }, 500);
+            //https://github.com/microsoft/monaco-editor/issues/2177
+            editor.getContribution("editor.contrib.suggestController").widget.value._setDetailsVisible(true);
+
+
         });
     </script>
 </body>
