@@ -34,4 +34,4 @@ Focus on buglessness. Then use this in lmpify (for URLs only at first). Worth a 
 - url has: inlay with tokencount, orange underline color style, goto button, hover title+description+og-image
 - on every edit, content should load in new monacobro-data object just like with textarea, so new urls get added quickly.
 
-Having this will open the door to something much more interesting: a background agent, gathering suggestions and caching those! Perfect to use the Task API for!
+Having this will open the door to something much more interesting: a background agent, gathering suggestions and caching those, then showing them inline in the markdown! It may be interesting to use the Task API for this!
