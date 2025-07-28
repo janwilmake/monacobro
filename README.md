@@ -1,5 +1,7 @@
 # Monacobro.js
 
+[Discuss](https://x.com/janwilmake/status/1949847194019791237)
+
 Serializable Monaco.js Loader from backend data
 
 Usage
@@ -22,3 +24,14 @@ Demo: [See live demo](https://monacobro.com/monacobro)
 > This module will have breaking changes so it's best practice to copy/paste the script into your own production environment.
 
 # TODO
+
+- Automatically adjust to system-theme
+- Ensure it updates data when application/json data updates
+- Try to reduce layout shifts onload
+
+Focus on buglessness. Then use this in lmpify (for URLs only at first). Worth a post.
+
+- url has: inlay with tokencount, orange underline color style, goto button, hover title+description+og-image
+- on every edit, content should load in new monacobro-data object just like with textarea, so new urls get added quickly.
+
+Having this will open the door to something much more interesting: a background agent, gathering suggestions and caching those! Perfect to use the Task API for!
