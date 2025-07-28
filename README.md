@@ -15,7 +15,9 @@ Usage
 <script src="https://monacobro.com/monacobro.js"></script>
 ```
 
-> ![WARNING]
+Demo: [See live demo](https://monacobro.com/monacobro)
+
+> [!WARNING]
 >
 > This module will have breaking changes so it's best practice to copy/paste the script into your own production environment.
 
