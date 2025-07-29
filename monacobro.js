@@ -170,7 +170,7 @@ function updateDecorations() {
         const lineNumber = lineIndex + 1;
         const start = index + 1;
         const end = start + searchPattern.length;
-
+        //@ts-ignore
         decorations.push({
           range: new monaco.Range(lineNumber, start, lineNumber, end),
           options: { inlineClassName: `style-${pattern.style}` },
@@ -654,7 +654,7 @@ require(["vs/editor/editor.main"], function () {
       },
     }
   );
-
+  //@ts-ignore
   window.monacobro = {
     editor: editor,
     addDisposable: (disposable) => disposables.push(disposable),
@@ -715,12 +715,10 @@ require(["vs/editor/editor.main"], function () {
   // Auto-expand suggestions
   setTimeout(() => {
     try {
-      const suggestController = editor.getContribution(
-        "editor.contrib.suggestController"
-      );
-      if (suggestController?.widget?.value) {
-        suggestController.widget.value._setDetailsVisible(true);
-      }
+      editor
+        .getContribution("editor.contrib.suggestController")
+        //@ts-ignore
+        ?.widget?.value?._setDetailsVisible(true);
     } catch (e) {
       console.log("Could not auto-expand suggestions details:", e);
     }
