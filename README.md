@@ -8,6 +8,10 @@
 
 Monacobro transforms static JSON data into a fully-featured Monaco editor experience. Define patterns with trigger characters, custom styling, autocomplete suggestions, hover documentation, error markers, inlay hints, and clickable links - all through declarative configuration. Perfect for creating domain-specific editors, documentation tools, or enhanced text experiences without writing complex Monaco provider code.
 
+Limitations:
+
+- focus on markdown, no nother languages supported for now
+
 ## Quick Start
 
 ```html
