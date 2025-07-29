@@ -138,10 +138,9 @@ dataScript.textContent = JSON.stringify(config);
 - ✅ Automatically adjust to system-theme
 - ✅ Use `mutation-observer.html` example to allow listening to changes of the data and rendering that.
 - ✅ Add JSDoc intellisense for the `monacobro.js` file
-- Try to reduce layout shifts onload and on refresh
-- Check how monaco is loaded in xytext and what is needed to use monacobro instead (e.g. how to create additional listeners? this is important to know)
-- Try using it in xytext
-- Create documentation of how to use it and where the boundary is...
+- ✅ Create documentation of how to use it and where the boundary is...
+- ❌ Try to reduce layout shifts onload and on refresh. **Don't see easy options, but only happens for Codelens**
+- Check how monaco is loaded in xytext and what is needed to use monacobro instead. Try using it in xytext, add data to html using lol-html. AI should be able to do this based on README.
 
 Focus on buglessness. Then use this in LMPIFY (for URLs only at first). Worth a post.
 

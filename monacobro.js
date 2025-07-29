@@ -494,29 +494,29 @@ function registerProviders() {
               (pattern.triggerCharacter || "") + pattern.word;
             const index = line.indexOf(searchPattern);
 
-            if (index !== -1) {
-              const range = {
-                startLineNumber: lineIndex + 1,
-                startColumn: index + 1,
-                endLineNumber: lineIndex + 1,
-                endColumn: index + searchPattern.length + 1,
-              };
+            if (index === -1) return;
 
-              if (pattern.actions && pattern.actions.length > 0) {
-                pattern.actions.forEach((action) => {
-                  if (action.tooltip) {
-                    lenses.push({
-                      range,
-                      command: {
-                        id: "openUrl",
-                        title: action.label,
-                        arguments: [action.url],
-                        tooltip: action.label,
-                      },
-                    });
-                  }
-                });
-              }
+            const range = {
+              startLineNumber: lineIndex + 1,
+              startColumn: index + 1,
+              endLineNumber: lineIndex + 1,
+              endColumn: index + searchPattern.length + 1,
+            };
+
+            if (pattern.actions && pattern.actions.length > 0) {
+              pattern.actions.forEach((action) => {
+                if (action.tooltip) {
+                  lenses.push({
+                    range,
+                    command: {
+                      id: "openUrl",
+                      title: action.label,
+                      arguments: [action.url],
+                      tooltip: action.label,
+                    },
+                  });
+                }
+              });
             }
           });
         });
