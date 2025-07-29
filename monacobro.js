@@ -1,183 +1,193 @@
 // Get dataset from script tag
 const datasetScript = document.getElementById("monacobro-data");
-const dataset = JSON.parse(datasetScript.textContent);
+let dataset = JSON.parse(datasetScript.textContent);
 
-require.config({
-  paths: { vs: "https://unpkg.com/monaco-editor@0.44.0/min/vs" },
-});
+// State tracking for efficient updates
+let currentDecorations = [];
+let disposables = [];
+let editor = null;
+let lastDatasetHash = null;
 
-require(["vs/editor/editor.main"], function () {
-  // Generate CSS from styles map
+// Helper to create a simple hash of the dataset
+function hashDataset(data) {
+  return JSON.stringify({
+    patterns: data.patterns,
+    styles: data.styles,
+    content: data.content,
+  });
+}
+
+// Clean up all Monaco disposables
+function cleanupDisposables() {
+  disposables.forEach((d) => d.dispose());
+  disposables = [];
+}
+
+// Update CSS styles
+function updateStyles(newStyles) {
+  const existingStyle = document.querySelector("#monacobro-styles");
+  if (existingStyle) {
+    existingStyle.remove();
+  }
+
   const style = document.createElement("style");
+  style.id = "monacobro-styles";
   let css = "";
 
-  Object.entries(dataset.styles).forEach(([styleName, styleConfig]) => {
+  Object.entries(newStyles).forEach(([styleName, styleConfig]) => {
     css += `.monaco-editor .style-${styleName} { ${styleConfig.css} }\n`;
   });
 
   style.textContent = css;
   document.head.appendChild(style);
+}
 
-  // Extract unique trigger characters from patterns
+// Helper function to get trigger context at position
+function getTriggerContext(model, position) {
+  const line = model.getLineContent(position.lineNumber);
+  const beforeCursor = line.substring(0, position.column - 1);
+
   const triggerCharacters = [
     ...new Set(dataset.patterns.map((p) => p.triggerCharacter).filter(Boolean)),
   ];
 
-  // Create the editor
-  const editor = monaco.editor.create(
-    document.getElementById("monacobro-container"),
-    {
-      value: dataset.content,
-      language: "markdown",
-      theme: "vs-dark",
-      fontSize: 14,
-      lineNumbers: "on",
-      wordWrap: "on",
-      minimap: { enabled: false },
-      scrollBeyondLastLine: false,
-      automaticLayout: true,
-      lightbulb: { enabled: true },
-      links: false,
-      suggest: {
-        showIcons: true,
-        showSnippets: true,
-        showWords: true,
-        preview: true,
-        snippetsPreventQuickSuggestions: false,
-        showInlineDetails: true,
-        insertMode: "replace",
-        filterGraceful: true,
-        localityBonus: true,
-        shareSuggestSelections: false,
-      },
-      quickSuggestions: {
-        other: true,
-        comments: true,
-        strings: true,
-      },
-      suggestOnTriggerCharacters: true,
-      acceptSuggestionOnCommitCharacter: true,
-      acceptSuggestionOnEnter: "on",
-      wordBasedSuggestions: true,
-      inlayHints: {
-        enabled: true,
-        fontSize: 12,
-        fontFamily: "Segoe UI, system-ui",
-      },
+  // Check for trigger characters first
+  let triggerChar = null;
+  let triggerIndex = -1;
+
+  for (const char of triggerCharacters) {
+    const lastIndex = beforeCursor.lastIndexOf(char);
+    if (lastIndex > triggerIndex) {
+      triggerIndex = lastIndex;
+      triggerChar = char;
     }
-  );
+  }
 
-  const disposables = [];
-  let currentDecorations = [];
-
-  // Helper function to get trigger context at position
-  function getTriggerContext(model, position) {
-    const line = model.getLineContent(position.lineNumber);
-    const beforeCursor = line.substring(0, position.column - 1);
-
-    // Check for trigger characters first
-    let triggerChar = null;
-    let triggerIndex = -1;
-
-    for (const char of triggerCharacters) {
-      const lastIndex = beforeCursor.lastIndexOf(char);
-      if (lastIndex > triggerIndex) {
-        triggerIndex = lastIndex;
-        triggerChar = char;
-      }
-    }
-
-    if (triggerIndex !== -1) {
-      const textAfterTrigger = beforeCursor.substring(triggerIndex + 1);
-      if (!/\s/.test(textAfterTrigger)) {
-        return {
-          triggerChar,
-          triggerIndex,
-          textAfterTrigger,
-          range: {
-            startLineNumber: position.lineNumber,
-            endLineNumber: position.lineNumber,
-            startColumn: triggerIndex + 2, // +1 for 1-based, +1 to skip trigger char
-            endColumn: position.column,
-          },
-        };
-      }
-    }
-
-    // Check for regular word patterns (no trigger character)
-    const word = model.getWordUntilPosition(position);
-    if (word.word.length > 0) {
+  if (triggerIndex !== -1) {
+    const textAfterTrigger = beforeCursor.substring(triggerIndex + 1);
+    if (!/\s/.test(textAfterTrigger)) {
       return {
-        triggerChar: null,
-        triggerIndex: -1,
-        textAfterTrigger: word.word,
+        triggerChar,
+        triggerIndex,
+        textAfterTrigger,
         range: {
           startLineNumber: position.lineNumber,
           endLineNumber: position.lineNumber,
-          startColumn: word.startColumn,
-          endColumn: word.endColumn,
+          startColumn: triggerIndex + 2,
+          endColumn: position.column,
         },
       };
     }
-
-    return null;
   }
 
-  // Enhanced autocomplete provider
+  // Check for regular word patterns
+  const word = model.getWordUntilPosition(position);
+  if (word.word.length > 0) {
+    return {
+      triggerChar: null,
+      triggerIndex: -1,
+      textAfterTrigger: word.word,
+      range: {
+        startLineNumber: position.lineNumber,
+        endLineNumber: position.lineNumber,
+        startColumn: word.startColumn,
+        endColumn: word.endColumn,
+      },
+    };
+  }
+
+  return null;
+}
+
+// Apply decorations and markers
+function updateDecorations() {
+  if (!editor) return;
+
+  const model = editor.getModel();
+  const lines = model.getValue().split("\n");
+  const decorations = [];
+  const markers = [];
+  let inCodeBlock = false;
+
+  lines.forEach((line, lineIndex) => {
+    if (line.trim().startsWith("```")) {
+      inCodeBlock = !inCodeBlock;
+      return;
+    }
+    if (inCodeBlock) return;
+
+    dataset.patterns.forEach((pattern) => {
+      if (!pattern.word) return;
+
+      const searchPattern = (pattern.triggerCharacter || "") + pattern.word;
+      let searchStart = 0;
+      let index;
+
+      while ((index = line.indexOf(searchPattern, searchStart)) !== -1) {
+        const lineNumber = lineIndex + 1;
+        const start = index + 1;
+        const end = start + searchPattern.length;
+
+        decorations.push({
+          range: new monaco.Range(lineNumber, start, lineNumber, end),
+          options: { inlineClassName: `style-${pattern.style}` },
+        });
+
+        if (pattern.errorReplace && pattern.errorSeverity) {
+          const severity =
+            pattern.errorSeverity === "error"
+              ? monaco.MarkerSeverity.Error
+              : pattern.errorSeverity === "warning"
+              ? monaco.MarkerSeverity.Warning
+              : monaco.MarkerSeverity.Info;
+
+          markers.push({
+            startLineNumber: lineNumber,
+            startColumn: start,
+            endLineNumber: lineNumber,
+            endColumn: end,
+            message: pattern.errorLabel || `Issue with: ${searchPattern}`,
+            severity: severity,
+          });
+        }
+
+        searchStart = index + 1;
+      }
+    });
+  });
+
+  currentDecorations = editor.deltaDecorations(currentDecorations, decorations);
+  monaco.editor.setModelMarkers(model, "patterns", markers);
+}
+
+// Register all Monaco providers
+function registerProviders() {
+  cleanupDisposables();
+
+  const triggerCharacters = [
+    ...new Set(dataset.patterns.map((p) => p.triggerCharacter).filter(Boolean)),
+  ];
+
+  // Autocomplete provider
   disposables.push(
     monaco.languages.registerCompletionItemProvider("markdown", {
       triggerCharacters: [
         ...triggerCharacters,
-        "a",
-        "b",
-        "c",
-        "d",
-        "e",
-        "f",
-        "g",
-        "h",
-        "i",
-        "j",
-        "k",
-        "l",
-        "m",
-        "n",
-        "o",
-        "p",
-        "q",
-        "r",
-        "s",
-        "t",
-        "u",
-        "v",
-        "w",
-        "x",
-        "y",
-        "z",
+        ..."abcdefghijklmnopqrstuvwxyz",
       ],
-
       provideCompletionItems: function (model, position, context) {
         const triggerContext = getTriggerContext(model, position);
-
-        if (!triggerContext) {
-          return { suggestions: [] };
-        }
+        if (!triggerContext) return { suggestions: [] };
 
         const { triggerChar, textAfterTrigger, range } = triggerContext;
         const suggestions = [];
 
-        // Filter patterns based on trigger character and text matching
         const matchingPatterns = dataset.patterns.filter((pattern) => {
           if (!pattern.word) return false;
-
-          // If we have a trigger character, only show patterns with matching trigger
           if (triggerChar && pattern.triggerCharacter !== triggerChar)
             return false;
-
-          // If no trigger character, only show patterns without trigger
           if (!triggerChar && pattern.triggerCharacter) return false;
 
-          // Check if pattern word matches the text after trigger
           const isMatch =
             textAfterTrigger.length === 0 ||
             pattern.word
@@ -188,7 +198,6 @@ require(["vs/editor/editor.main"], function () {
         });
 
         matchingPatterns.forEach((pattern, index) => {
-          // Extract plain text from HTML for detail display
           const plainText = pattern.info
             ? pattern.info.replace(/<[^>]*>/g, "").replace(/&[^;]+;/g, "")
             : "";
@@ -233,16 +242,12 @@ require(["vs/editor/editor.main"], function () {
 
         lines.forEach((line, lineIndex) => {
           const lineNumber = lineIndex + 1;
-
-          // Skip if outside the requested range
           if (
             lineNumber < range.startLineNumber ||
             lineNumber > range.endLineNumber
-          ) {
+          )
             return;
-          }
 
-          // Track code blocks
           if (line.trim().startsWith("```")) {
             inCodeBlock = !inCodeBlock;
             return;
@@ -262,10 +267,7 @@ require(["vs/editor/editor.main"], function () {
 
               hints.push({
                 kind: monaco.languages.InlayHintKind.Type,
-                position: {
-                  column: endColumn,
-                  lineNumber: lineNumber,
-                },
+                position: { column: endColumn, lineNumber: lineNumber },
                 label: `: ${pattern.inlay}`,
                 whitespaceBefore: true,
                 tooltip: pattern.info
@@ -281,15 +283,12 @@ require(["vs/editor/editor.main"], function () {
           });
         });
 
-        return {
-          hints,
-          dispose: () => {},
-        };
+        return { hints, dispose: () => {} };
       },
     })
   );
 
-  // Enhanced hover provider
+  // Hover provider
   disposables.push(
     monaco.languages.registerHoverProvider("markdown", {
       provideHover: (model, position) => {
@@ -298,7 +297,6 @@ require(["vs/editor/editor.main"], function () {
         for (const pattern of dataset.patterns) {
           if (!pattern.word) continue;
 
-          // Look for trigger + word pattern or just word
           const searchPattern = (pattern.triggerCharacter || "") + pattern.word;
           const index = line.indexOf(searchPattern);
 
@@ -342,7 +340,7 @@ require(["vs/editor/editor.main"], function () {
     })
   );
 
-  // Enhanced link provider
+  // Link provider
   disposables.push(
     monaco.languages.registerLinkProvider("markdown", {
       provideLinks: (model) => {
@@ -383,7 +381,7 @@ require(["vs/editor/editor.main"], function () {
     })
   );
 
-  // Quick fixes for replacements
+  // Code action provider
   disposables.push(
     monaco.languages.registerCodeActionProvider("markdown", {
       provideCodeActions: (model, range) => {
@@ -431,7 +429,7 @@ require(["vs/editor/editor.main"], function () {
     })
   );
 
-  // Enhanced code lens
+  // Code lens provider
   disposables.push(
     monaco.languages.registerCodeLensProvider("markdown", {
       provideCodeLenses: (model) => {
@@ -477,6 +475,129 @@ require(["vs/editor/editor.main"], function () {
       },
     })
   );
+}
+
+// Handle dataset updates efficiently
+function handleDatasetUpdate(newDataset) {
+  const newHash = hashDataset(newDataset);
+
+  // Skip if no actual changes
+  if (newHash === lastDatasetHash) return;
+
+  const oldDataset = dataset;
+  dataset = newDataset;
+  lastDatasetHash = newHash;
+
+  // Update styles if changed
+  if (JSON.stringify(oldDataset.styles) !== JSON.stringify(newDataset.styles)) {
+    updateStyles(newDataset.styles);
+  }
+
+  // Update content if changed
+  if (oldDataset.content !== newDataset.content) {
+    const currentPosition = editor.getPosition();
+    editor.setValue(newDataset.content);
+    editor.setPosition(currentPosition);
+  }
+
+  // Re-register providers if patterns changed
+  if (
+    JSON.stringify(oldDataset.patterns) !== JSON.stringify(newDataset.patterns)
+  ) {
+    registerProviders();
+  }
+
+  // Always update decorations as they depend on current content and patterns
+  setTimeout(updateDecorations, 50);
+}
+
+function getSystemTheme() {
+  return window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "vs-dark"
+    : "vs";
+}
+
+function updateMonacoTheme() {
+  if (editor) {
+    const theme = getSystemTheme();
+    monaco.editor.setTheme(theme);
+  }
+}
+
+// Set up mutation observer
+new MutationObserver((mutations) => {
+  mutations.forEach((mutation) => {
+    if (mutation.type === "childList" || mutation.type === "characterData") {
+      try {
+        const newDataset = JSON.parse(datasetScript.textContent);
+        handleDatasetUpdate(newDataset);
+      } catch (e) {
+        console.error("Failed to parse updated dataset:", e);
+      }
+    }
+  });
+}).observe(datasetScript, {
+  subtree: true,
+  childList: true,
+  characterData: true,
+});
+
+// Initialize Monaco Editor
+require.config({
+  paths: { vs: "https://unpkg.com/monaco-editor@0.44.0/min/vs" },
+});
+
+require(["vs/editor/editor.main"], function () {
+  // Initial setup
+  updateStyles(dataset.styles);
+  lastDatasetHash = hashDataset(dataset);
+
+  // Create editor
+  editor = monaco.editor.create(
+    document.getElementById("monacobro-container"),
+    {
+      value: dataset.content,
+      language: "markdown",
+      theme: getSystemTheme(),
+      fontSize: 14,
+      lineNumbers: "on",
+      wordWrap: "on",
+      minimap: { enabled: false },
+      scrollBeyondLastLine: false,
+      automaticLayout: true,
+      lightbulb: { enabled: true },
+      links: false,
+      suggest: {
+        showIcons: true,
+        showSnippets: true,
+        showWords: true,
+        preview: true,
+        snippetsPreventQuickSuggestions: false,
+        showInlineDetails: true,
+        insertMode: "replace",
+        filterGraceful: true,
+        localityBonus: true,
+        shareSuggestSelections: false,
+      },
+      quickSuggestions: {
+        other: true,
+        comments: true,
+        strings: true,
+      },
+      suggestOnTriggerCharacters: true,
+      acceptSuggestionOnCommitCharacter: true,
+      acceptSuggestionOnEnter: "on",
+      wordBasedSuggestions: true,
+      inlayHints: {
+        enabled: true,
+        fontSize: 12,
+        fontFamily: "Segoe UI, system-ui",
+      },
+    }
+  );
+
+  // Register providers
+  registerProviders();
 
   // URL opener command
   monaco.editor.addCommand({
@@ -484,73 +605,8 @@ require(["vs/editor/editor.main"], function () {
     run: (_, url) => window.open(url, "_blank"),
   });
 
-  // Apply decorations with proper cleanup
-  const updateDecorations = () => {
-    const model = editor.getModel();
-    const lines = model.getValue().split("\n");
-    const decorations = [];
-    const markers = [];
-    let inCodeBlock = false;
-
-    lines.forEach((line, lineIndex) => {
-      if (line.trim().startsWith("```")) {
-        inCodeBlock = !inCodeBlock;
-        return;
-      }
-      if (inCodeBlock) return;
-
-      dataset.patterns.forEach((pattern) => {
-        if (!pattern.word) return;
-
-        const searchPattern = (pattern.triggerCharacter || "") + pattern.word;
-        let searchStart = 0;
-        let index;
-
-        while ((index = line.indexOf(searchPattern, searchStart)) !== -1) {
-          const lineNumber = lineIndex + 1;
-          const start = index + 1;
-          const end = start + searchPattern.length;
-
-          // Apply main decoration
-          decorations.push({
-            range: new monaco.Range(lineNumber, start, lineNumber, end),
-            options: { inlineClassName: `style-${pattern.style}` },
-          });
-
-          // Add markers for errors
-          if (pattern.errorReplace && pattern.errorSeverity) {
-            const severity =
-              pattern.errorSeverity === "error"
-                ? monaco.MarkerSeverity.Error
-                : pattern.errorSeverity === "warning"
-                ? monaco.MarkerSeverity.Warning
-                : monaco.MarkerSeverity.Info;
-
-            markers.push({
-              startLineNumber: lineNumber,
-              startColumn: start,
-              endLineNumber: lineNumber,
-              endColumn: end,
-              message: pattern.errorLabel || `Issue with: ${searchPattern}`,
-              severity: severity,
-            });
-          }
-
-          searchStart = index + 1;
-        }
-      });
-    });
-
-    currentDecorations = editor.deltaDecorations(
-      currentDecorations,
-      decorations
-    );
-    monaco.editor.setModelMarkers(model, "patterns", markers);
-  };
-
-  // Auto-trigger suggestions on typing with proper delay
+  // Auto-trigger suggestions on typing
   let typingTimer;
-
   editor.onDidChangeModelContent((e) => {
     clearTimeout(typingTimer);
     typingTimer = setTimeout(() => {
@@ -558,7 +614,6 @@ require(["vs/editor/editor.main"], function () {
       const model = editor.getModel();
       const triggerContext = getTriggerContext(model, position);
 
-      // Trigger if we have a valid trigger context
       if (triggerContext && triggerContext.textAfterTrigger.length > 0) {
         const matchingPatterns = dataset.patterns.filter((pattern) => {
           if (!pattern.word) return false;
@@ -581,17 +636,16 @@ require(["vs/editor/editor.main"], function () {
         }
       }
 
-      // Update decorations
       updateDecorations();
     }, 150);
   });
 
-  // Manual trigger with Ctrl+Space
+  // Manual trigger
   editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Space, () => {
     editor.trigger("manual", "editor.action.triggerSuggest", {});
   });
 
-  // CRUCIAL: Set details visible by default for auto-expanded behavior
+  // Auto-expand suggestions
   setTimeout(() => {
     try {
       const suggestController = editor.getContribution(
@@ -612,16 +666,16 @@ require(["vs/editor/editor.main"], function () {
   // Initial decoration update
   setTimeout(updateDecorations, 100);
 
-  // Auto-resize editor on window resize
-  window.addEventListener("resize", () => {
-    editor.layout();
-  });
-
-  // Focus the editor
+  // Auto-resize and focus
+  window.addEventListener("resize", () => editor.layout());
   editor.focus();
 
-  // Cleanup function
+  const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  mediaQuery.addEventListener("change", updateMonacoTheme);
+
+  // Cleanup on unload
   window.addEventListener("beforeunload", () => {
-    disposables.forEach((d) => d.dispose());
+    cleanupDisposables();
+    mediaQuery.removeEventListener("change", updateMonacoTheme);
   });
 });

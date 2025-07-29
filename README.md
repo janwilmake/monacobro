@@ -26,12 +26,12 @@ Demo: [See live demo](https://monacobro.com/monacobro)
 # TODO
 
 - Automatically adjust to system-theme
-- Ensure it updates data when application/json data updates
-- Try to reduce layout shifts onload
+- ✅ Use `mutation-observer.html` example to allow listening to changes of the data and rendering that.
+- Try to reduce layout shifts onload and on refresh
 
 Focus on buglessness. Then use this in lmpify (for URLs only at first). Worth a post.
 
 - url has: inlay with tokencount, orange underline color style, goto button, hover title+description+og-image
 - on every edit, content should load in new monacobro-data object just like with textarea, so new urls get added quickly.
 
-Having this will open the door to something much more interesting: a background agent, gathering suggestions and caching those, then showing them inline in the markdown! It may be interesting to use the Task API for this!
+Having this will open the door to something much more interesting: a background agent, gathering suggestions and caching those, then showing them inline in the markdown! It may be interesting to use the Task API for this, but also, of course, my own apis.
