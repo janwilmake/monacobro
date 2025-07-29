@@ -139,16 +139,22 @@ dataScript.textContent = JSON.stringify(config);
 
 # TODO
 
-- ✅ Automatically adjust to system-theme
-- ✅ Use `mutation-observer.html` example to allow listening to changes of the data and rendering that.
-- ✅ Add JSDoc intellisense for the `monacobro.js` file
-- ✅ Create documentation of how to use it and where the boundary is...
 - ❌ Try to reduce layout shifts onload and on refresh. **Don't see easy options, but only happens for Codelens**
-- Check how monaco is loaded in xytext and what is needed to use monacobro instead. Try using it in xytext, add data to html using lol-html. AI should be able to do this based on README.
-
-Focus on buglessness. Then use this in LMPIFY (for URLs only at first). Worth a post.
-
-- url has: inlay with tokencount, orange underline color style, goto button, hover title+description+og-image
+- Fix problem with selecting everything if clicked below the last line. First, fix this in standalone example.
+- Check how monaco is loaded in xytext and what is needed to use monacobro instead. Try using it in xytext, add data to html using `lol-html` so content also becomes safe. AI should be able to do this based on README.
+- To `xytext`, allow adding other files similarly to how this can be done in cursor; use `@` in markdown.
 - on every edit, content should load in new monacobro-data object just like with textarea, so new urls get added quickly.
 
-Having this will open the door to something much more interesting: a background agent, gathering suggestions and caching those, then showing them inline in the markdown! It may be interesting to use the Task API for this, but also, of course, my own apis.
+# monacobro.js in letmeprompt.com!
+
+- embed contextarea apis into lmpify backend so it's authenticated by cookie and can't be abused
+- turn urls into monacobro.js instellisense - All URLs have: inlay with tokencount, orange underline color style, goto button, hover title+description+og-image
+- Quote tweet, launch xytext update https://x.com/EastlondonDev/status/1930379050997923846
+
+Having this UI and using it with ease will open the door to something much more interesting: a background agent, gathering suggestions and caching those, then showing them inline in the markdown! It may be interesting to use the Task API for this, but also, of course, my own apis.
+
+Just put it in there! Together with other design improvements and potentially a new headline/og, this will be huge for adoption by programmers. They'll love a context-optimised editor.
+
+# doing formdata -> formdata API-calls within xytext
+
+see https://xytext.com/janwilmake/xytext/TODO.md
