@@ -1,14 +1,44 @@
+//@ts-check
+/// <reference lib="esnext" />
+/// <reference types="monaco-editor" />
+
+/**
+ * @typedef {import('monaco-editor').editor.IStandaloneCodeEditor} IStandaloneCodeEditor
+ * @typedef {import('monaco-editor').editor.ITextModel} ITextModel
+ * @typedef {import('monaco-editor').IDisposable} IDisposable
+ * @typedef {import('monaco-editor').editor.IModelDecoration} IModelDecoration
+ * @typedef {import('monaco-editor').editor.IMarkerData} IMarkerData
+ * @typedef {import('monaco-editor').Position} Position
+ * @typedef {import('monaco-editor').languages.CompletionItem} CompletionItem
+ * @typedef {import('monaco-editor').languages.InlayHint} InlayHint
+ * @typedef {import('monaco-editor').languages.CodeAction} CodeAction
+ * @typedef {import('monaco-editor').languages.CodeLens} CodeLens
+ */
+/** @type {typeof import('monaco-editor')} */
+var monaco;
+
 // Get dataset from script tag
 const datasetScript = document.getElementById("monacobro-data");
 let dataset = JSON.parse(datasetScript.textContent);
 
 // State tracking for efficient updates
+/** @type {string[]} */
 let currentDecorations = [];
+
+/** @type {IDisposable[]} */
 let disposables = [];
+
+/** @type {IStandaloneCodeEditor | null} */
 let editor = null;
+
+/** @type {string | null} */
 let lastDatasetHash = null;
 
 // Helper to create a simple hash of the dataset
+/**
+ * @param {any} data
+ * @returns {string}
+ */
 function hashDataset(data) {
   return JSON.stringify({
     patterns: data.patterns,
@@ -24,6 +54,9 @@ function cleanupDisposables() {
 }
 
 // Update CSS styles
+/**
+ * @param {Record<string, {css: string}>} newStyles
+ */
 function updateStyles(newStyles) {
   const existingStyle = document.querySelector("#monacobro-styles");
   if (existingStyle) {
@@ -43,11 +76,17 @@ function updateStyles(newStyles) {
 }
 
 // Helper function to get trigger context at position
+/**
+ * @param {ITextModel} model
+ * @param {Position} position
+ * @returns {{triggerChar: string | null, triggerIndex: number, textAfterTrigger: string, range: {startLineNumber: number, endLineNumber: number, startColumn: number, endColumn: number}} | null}
+ */
 function getTriggerContext(model, position) {
   const line = model.getLineContent(position.lineNumber);
   const beforeCursor = line.substring(0, position.column - 1);
 
   const triggerCharacters = [
+    //@ts-ignore
     ...new Set(dataset.patterns.map((p) => p.triggerCharacter).filter(Boolean)),
   ];
 
@@ -104,8 +143,12 @@ function updateDecorations() {
   if (!editor) return;
 
   const model = editor.getModel();
+  if (!model) return;
+
   const lines = model.getValue().split("\n");
+  /** @type {IModelDecoration[]} */
   const decorations = [];
+  /** @type {IMarkerData[]} */
   const markers = [];
   let inCodeBlock = false;
 
@@ -165,6 +208,7 @@ function registerProviders() {
   cleanupDisposables();
 
   const triggerCharacters = [
+    //@ts-ignore
     ...new Set(dataset.patterns.map((p) => p.triggerCharacter).filter(Boolean)),
   ];
 
@@ -173,6 +217,7 @@ function registerProviders() {
     monaco.languages.registerCompletionItemProvider("markdown", {
       triggerCharacters: [
         ...triggerCharacters,
+        //@ts-ignore
         ..."abcdefghijklmnopqrstuvwxyz",
       ],
       provideCompletionItems: function (model, position, context) {
@@ -180,6 +225,7 @@ function registerProviders() {
         if (!triggerContext) return { suggestions: [] };
 
         const { triggerChar, textAfterTrigger, range } = triggerContext;
+        /** @type {CompletionItem[]} */
         const suggestions = [];
 
         const matchingPatterns = dataset.patterns.filter((pattern) => {
@@ -236,6 +282,7 @@ function registerProviders() {
   disposables.push(
     monaco.languages.registerInlayHintsProvider("markdown", {
       provideInlayHints(model, range, token) {
+        /** @type {InlayHint[]} */
         const hints = [];
         const lines = model.getValue().split("\n");
         let inCodeBlock = false;
@@ -269,7 +316,6 @@ function registerProviders() {
                 kind: monaco.languages.InlayHintKind.Type,
                 position: { column: endColumn, lineNumber: lineNumber },
                 label: `: ${pattern.inlay}`,
-                whitespaceBefore: true,
                 tooltip: pattern.info
                   ? {
                       value: pattern.info,
@@ -305,6 +351,7 @@ function registerProviders() {
             const end = start + searchPattern.length;
 
             if (position.column >= start && position.column <= end) {
+              /** @type {import('monaco-editor').IMarkdownString[]} */
               const contents = [];
 
               if (pattern.info) {
@@ -386,6 +433,7 @@ function registerProviders() {
     monaco.languages.registerCodeActionProvider("markdown", {
       provideCodeActions: (model, range) => {
         const line = model.getLineContent(range.startLineNumber);
+        /** @type {CodeAction[]} */
         const actions = [];
 
         dataset.patterns.forEach((pattern) => {
@@ -405,6 +453,7 @@ function registerProviders() {
                   edit: {
                     edits: [
                       {
+                        versionId: 1,
                         resource: model.uri,
                         textEdit: {
                           range: {
@@ -434,6 +483,7 @@ function registerProviders() {
     monaco.languages.registerCodeLensProvider("markdown", {
       provideCodeLenses: (model) => {
         const lines = model.getValue().split("\n");
+        /** @type {CodeLens[]} */
         const lenses = [];
 
         lines.forEach((line, lineIndex) => {
@@ -478,6 +528,9 @@ function registerProviders() {
 }
 
 // Handle dataset updates efficiently
+/**
+ * @param {any} newDataset
+ */
 function handleDatasetUpdate(newDataset) {
   const newHash = hashDataset(newDataset);
 
@@ -494,10 +547,12 @@ function handleDatasetUpdate(newDataset) {
   }
 
   // Update content if changed
-  if (oldDataset.content !== newDataset.content) {
+  if (oldDataset.content !== newDataset.content && editor) {
     const currentPosition = editor.getPosition();
     editor.setValue(newDataset.content);
-    editor.setPosition(currentPosition);
+    if (currentPosition) {
+      editor.setPosition(currentPosition);
+    }
   }
 
   // Re-register providers if patterns changed
@@ -511,6 +566,9 @@ function handleDatasetUpdate(newDataset) {
   setTimeout(updateDecorations, 50);
 }
 
+/**
+ * @returns {string}
+ */
 function getSystemTheme() {
   return window.matchMedia("(prefers-color-scheme: dark)").matches
     ? "vs-dark"
@@ -543,10 +601,12 @@ new MutationObserver((mutations) => {
 });
 
 // Initialize Monaco Editor
+//@ts-ignore
 require.config({
   paths: { vs: "https://unpkg.com/monaco-editor@0.44.0/min/vs" },
 });
 
+//@ts-ignore
 require(["vs/editor/editor.main"], function () {
   // Initial setup
   updateStyles(dataset.styles);
@@ -565,7 +625,6 @@ require(["vs/editor/editor.main"], function () {
       minimap: { enabled: false },
       scrollBeyondLastLine: false,
       automaticLayout: true,
-      lightbulb: { enabled: true },
       links: false,
       suggest: {
         showIcons: true,
@@ -587,14 +646,19 @@ require(["vs/editor/editor.main"], function () {
       suggestOnTriggerCharacters: true,
       acceptSuggestionOnCommitCharacter: true,
       acceptSuggestionOnEnter: "on",
-      wordBasedSuggestions: true,
+      wordBasedSuggestions: "currentDocument",
       inlayHints: {
-        enabled: true,
+        enabled: "on",
         fontSize: 12,
         fontFamily: "Segoe UI, system-ui",
       },
     }
   );
+
+  window.monacobro = {
+    editor: editor,
+    addDisposable: (disposable) => disposables.push(disposable),
+  };
 
   // Register providers
   registerProviders();
@@ -612,6 +676,9 @@ require(["vs/editor/editor.main"], function () {
     typingTimer = setTimeout(() => {
       const position = editor.getPosition();
       const model = editor.getModel();
+
+      if (!position || !model) return;
+
       const triggerContext = getTriggerContext(model, position);
 
       if (triggerContext && triggerContext.textAfterTrigger.length > 0) {
@@ -651,11 +718,7 @@ require(["vs/editor/editor.main"], function () {
       const suggestController = editor.getContribution(
         "editor.contrib.suggestController"
       );
-      if (
-        suggestController &&
-        suggestController.widget &&
-        suggestController.widget.value
-      ) {
+      if (suggestController?.widget?.value) {
         suggestController.widget.value._setDetailsVisible(true);
       }
     } catch (e) {
