@@ -155,6 +155,6 @@ Having this UI and using it with ease will open the door to something much more 
 
 Just put it in there! Together with other design improvements and potentially a new headline/og, this will be huge for adoption by programmers. They'll love a context-optimised editor.
 
-# doing formdata -> formdata API-calls within xytext
+# Doing formdata -> formdata API-calls within xytext
 
 see https://xytext.com/janwilmake/xytext/TODO.md
