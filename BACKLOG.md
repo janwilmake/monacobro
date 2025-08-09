@@ -10,3 +10,6 @@ https://letmeprompt.com/rules-httpsuithu-64hjaj0
 https://x.com/jexia_ wants to port to monaco:
 https://github.com/microsoft/vscode-markdown-languageservice
 https://github.com/esm-dev/modern-monaco/issues/1
+
+Valtown also has a cool oss project around this https://x.com/stevekrouse/status/1953892248489279864
+https://github.com/val-town/codemirror-ts
