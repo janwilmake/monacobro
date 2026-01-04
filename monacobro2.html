@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monacobro with ContextArea</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #002ae2 0%, #78050f 100%);
+            min-height: 100vh;
+            color: white;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin: 0 0 10px 0;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        #monacobro {
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            height: 600px;
+            position: relative;
+        }
+
+        .drop-zone-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 42, 226, 0.95);
+            border: 4px dashed white;
+            border-radius: 10px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            pointer-events: none;
+        }
+
+        .drop-zone-overlay.active {
+            display: flex;
+        }
+
+        .drop-zone-content {
+            text-align: center;
+            color: white;
+        }
+
+        .drop-zone-content .icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .drop-zone-content h2 {
+            margin: 0 0 10px 0;
+            font-size: 2em;
+        }
+
+        .status-bar {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 8px;
+            padding: 10px 15px;
+            margin-top: 15px;
+            font-size: 0.85em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Monaco-specific styles */
+        .monaco-editor .url-decoration {
+            text-decoration: underline;
+            color: #4da6ff !important;
+            cursor: pointer;
+        }
+
+        .monaco-editor .url-decoration:hover {
+            background: rgba(77, 166, 255, 0.1) !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>🥸 Monacobro with ContextArea</h1>
+        <p>Monaco Editor with smart paste, drag & drop, and URL context analysis</p>
+    </div>
+
+    <div id="monacobro"></div>
+
+    <div class="status-bar">
+        <div id="status-message">Ready</div>
+    </div>
+
+    <script src="https://unpkg.com/monaco-editor@0.44.0/min/vs/loader.js"></script>
+    <script>
+        // Configuration
+        const CONFIG = {
+            pasteApiUrl: 'https://pastebin.contextarea.com',
+            contextApiUrl: 'https://context.contextarea.com',
+            pasteThreshold: 1000,
+            contextDebounce: 500, // Only debounce the API calls, not the detection
+        };
+
+        // Cache for context API results
+        const contextCache = new Map();
+        const pendingContextFetches = new Map(); // Track in-flight requests
+
+        // State
+        let editor = null;
+        let urlDecorations = [];
+        let dragCounter = 0;
+        let disposables = [];
+        let currentUrlsInText = new Map();
+
+        // Status management
+        function setStatus(message, isLoading = false) {
+            const statusEl = document.getElementById('status-message');
+            statusEl.innerHTML = isLoading ? `<span class="spinner"></span> ${message}` : message;
+        }
+
+        // Extract URLs from text
+        function extractUrls(text) {
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            const matches = text.match(urlRegex);
+            return matches ? Array.from(new Set(matches)) : [];
+        }
+
+        // Fetch context for URL with caching and deduplication
+        async function fetchContext(url) {
+            // Return from cache if available
+            if (contextCache.has(url)) {
+                return contextCache.get(url);
+            }
+
+            // If already fetching, wait for existing request
+            if (pendingContextFetches.has(url)) {
+                return pendingContextFetches.get(url);
+            }
+
+            // Start new fetch
+            const fetchPromise = (async () => {
+                try {
+                    const response = await fetch(`${CONFIG.contextApiUrl}?url=${encodeURIComponent(url)}`);
+                    if (!response.ok) throw new Error(`Context API error: ${response.status}`);
+
+                    const data = await response.json();
+                    contextCache.set(url, data);
+                    return data;
+                } finally {
+                    pendingContextFetches.delete(url);
+                }
+            })();
+
+            pendingContextFetches.set(url, fetchPromise);
+            return fetchPromise;
+        }
+
+        // Fetch URL content for expansion
+        async function fetchUrlContent(url) {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`Failed to fetch URL content: ${response.status}`);
+            return response.text();
+        }
+
+        // Update URL decorations immediately
+        function updateUrlDecorations() {
+            if (!editor) return;
+
+            const model = editor.getModel();
+            const text = model.getValue();
+            const lines = text.split('\n');
+            const decorations = [];
+            const urlsInText = new Map();
+
+            // Find all URLs and their positions
+            lines.forEach((line, lineIndex) => {
+                const urlRegex = /(https?:\/\/[^\s]+)/g;
+                let match;
+
+                while ((match = urlRegex.exec(line)) !== null) {
+                    const url = match[0];
+                    const startColumn = match.index + 1;
+                    const endColumn = startColumn + url.length;
+                    const range = new monaco.Range(lineIndex + 1, startColumn, lineIndex + 1, endColumn);
+
+                    if (!urlsInText.has(url)) {
+                        urlsInText.set(url, []);
+                    }
+                    urlsInText.get(url).push({ range, lineIndex: lineIndex + 1 });
+
+                    decorations.push({
+                        range: range,
+                        options: {
+                            inlineClassName: 'url-decoration',
+                        }
+                    });
+                }
+            });
+
+            // Update decorations immediately
+            urlDecorations = editor.deltaDecorations(urlDecorations, decorations);
+            currentUrlsInText = urlsInText;
+
+            // Re-register providers immediately with current data
+            registerProviders();
+
+            // Fetch context data for new URLs (debounced)
+            debouncedFetchContexts(urlsInText);
+        }
+
+        // Debounced context fetching (only the API calls are debounced)
+        let contextFetchTimeout = null;
+        function debouncedFetchContexts(urlsInText) {
+            clearTimeout(contextFetchTimeout);
+            contextFetchTimeout = setTimeout(async () => {
+                // Fetch context for URLs we don't have yet
+                const fetchPromises = [];
+                for (const url of urlsInText.keys()) {
+                    if (!contextCache.has(url) && !pendingContextFetches.has(url)) {
+                        fetchPromises.push(
+                            fetchContext(url).catch(error => {
+                                console.error('Error fetching context for URL:', url, error);
+                                return null;
+                            })
+                        );
+                    }
+                }
+
+                if (fetchPromises.length > 0) {
+                    await Promise.all(fetchPromises);
+                    // Re-register providers with fresh context data
+                    registerProviders();
+                }
+            }, CONFIG.contextDebounce);
+        }
+
+        // Register Monaco providers
+        function registerProviders() {
+            // Clear previous disposables
+            disposables.forEach(d => d.dispose());
+            disposables = [];
+
+            // Hover provider
+            disposables.push(
+                monaco.languages.registerHoverProvider('markdown', {
+                    provideHover: (model, position) => {
+                        for (const [url, positions] of currentUrlsInText.entries()) {
+                            for (const { range } of positions) {
+                                if (range.containsPosition(position)) {
+                                    const data = contextCache.get(url);
+
+                                    // Show loading state if still fetching
+                                    if (!data && pendingContextFetches.has(url)) {
+                                        return {
+                                            range: range,
+                                            contents: [{ value: '⏳ Loading context...', isTrusted: true }]
+                                        };
+                                    }
+
+                                    if (!data) return null;
+
+                                    let message = `**${data.title || 'Untitled'}**\n\n`;
+                                    if (data.type) message += `Type: ${data.type}\n`;
+                                    if (data.tokens) message += `Tokens: ${data.tokens}\n`;
+                                    if (data.description) message += `\n${data.description}`;
+
+                                    return {
+                                        range: range,
+                                        contents: [{ value: message, isTrusted: true }]
+                                    };
+                                }
+                            }
+                        }
+                        return null;
+                    }
+                })
+            );
+
+            // Inlay hints provider
+            disposables.push(
+                monaco.languages.registerInlayHintsProvider('markdown', {
+                    provideInlayHints(model, range, token) {
+                        const hints = [];
+
+                        for (const [url, positions] of currentUrlsInText.entries()) {
+                            const data = contextCache.get(url);
+                            const isLoading = pendingContextFetches.has(url);
+
+                            for (const { range: urlRange, lineIndex } of positions) {
+                                if (lineIndex < range.startLineNumber || lineIndex > range.endLineNumber) continue;
+
+                                let label = '';
+
+                                if (isLoading) {
+                                    label = '⏳ loading';
+                                } else if (data) {
+                                    if (data.tokens) label += `${data.tokens} tokens`;
+                                    if (data.type) label += label ? ` • ${data.type}` : data.type;
+                                }
+
+                                if (label) {
+                                    hints.push({
+                                        kind: monaco.languages.InlayHintKind.Type,
+                                        position: { column: urlRange.endColumn, lineNumber: lineIndex },
+                                        label: `: ${label}`,
+                                        tooltip: data?.title ? { value: data.title, supportHtml: false } : undefined,
+                                    });
+                                }
+                            }
+                        }
+
+                        return { hints, dispose: () => { } };
+                    },
+                })
+            );
+
+            // Code action provider for expanding URLs
+            disposables.push(
+                monaco.languages.registerCodeActionProvider('markdown', {
+                    provideCodeActions: (model, range) => {
+                        const actions = [];
+
+                        for (const [url, positions] of currentUrlsInText.entries()) {
+                            for (const { range: urlRange } of positions) {
+                                if (urlRange.intersectRanges(range)) {
+                                    const data = contextCache.get(url);
+                                    const title = data?.title || 'URL';
+
+                                    actions.push({
+                                        title: `🔍 Expand ${title}`,
+                                        kind: 'quickfix',
+                                        isPreferred: true,
+                                        command: {
+                                            id: 'expandUrl',
+                                            title: 'Expand URL',
+                                            arguments: [url, urlRange]
+                                        }
+                                    });
+                                }
+                            }
+                        }
+
+                        return { actions, dispose: () => { } };
+                    },
+                })
+            );
+
+            // Code lens provider
+            disposables.push(
+                monaco.languages.registerCodeLensProvider('markdown', {
+                    provideCodeLenses: (model) => {
+                        const lenses = [];
+
+                        for (const [url, positions] of currentUrlsInText.entries()) {
+                            const data = contextCache.get(url);
+
+                            for (const { range } of positions) {
+                                const title = data ? `🔍 Expand ${data.title || 'URL'}` : '🔍 Expand';
+
+                                lenses.push({
+                                    range: range,
+                                    command: {
+                                        id: 'expandUrl',
+                                        title: title,
+                                        arguments: [url, range],
+                                        tooltip: data?.title || 'Expand URL content'
+                                    }
+                                });
+                            }
+                        }
+
+                        return { lenses, dispose: () => { } };
+                    },
+                })
+            );
+        }
+
+        // Expand URL command handler
+        async function handleExpandUrl(url, range) {
+            setStatus('Fetching URL content...', true);
+
+            try {
+                const content = await fetchUrlContent(url);
+
+                editor.executeEdits('expand-url', [{
+                    range: range,
+                    text: content,
+                    forceMoveMarkers: true
+                }]);
+
+                setStatus(`✅ Expanded: ${url}`);
+                setTimeout(() => setStatus('Ready'), 3000);
+            } catch (error) {
+                console.error('Error expanding URL:', error);
+                setStatus(`❌ Failed to expand: ${error.message}`);
+                setTimeout(() => setStatus('Ready'), 3000);
+            }
+        }
+
+        // Upload to pastebin
+        async function uploadToPastebin(content) {
+            const response = await fetch(CONFIG.pasteApiUrl, {
+                method: 'POST',
+                body: content,
+                headers: { 'Content-Type': typeof content === 'string' ? 'text/plain' : content.type }
+            });
+
+            if (!response.ok) throw new Error(`Pastebin error: ${response.status}`);
+            return response.text();
+        }
+
+        // Insert text at cursor
+        function insertTextAtCursor(text) {
+            const position = editor.getPosition();
+            const range = new monaco.Range(
+                position.lineNumber, position.column,
+                position.lineNumber, position.column
+            );
+
+            editor.executeEdits('paste', [{
+                range: range,
+                text: text,
+                forceMoveMarkers: true
+            }]);
+
+            const lines = text.split('\n');
+            const lastLine = lines[lines.length - 1];
+            const newPosition = new monaco.Position(
+                position.lineNumber + lines.length - 1,
+                lines.length === 1 ? position.column + text.length : lastLine.length + 1
+            );
+            editor.setPosition(newPosition);
+            editor.focus();
+        }
+
+        // Setup paste handler
+        function setupPasteHandler() {
+            let shiftPressed = false;
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Shift') shiftPressed = true;
+            });
+
+            document.addEventListener('keyup', (e) => {
+                if (e.key === 'Shift') shiftPressed = false;
+            });
+
+            editor.onDidPaste(async (e) => {
+                if (shiftPressed) return;
+
+                const range = e.range;
+                const model = editor.getModel();
+                const pastedText = model.getValueInRange(range);
+
+                // Check if it's a URL or short text
+                if (pastedText.length <= CONFIG.pasteThreshold || /^https?:\/\//.test(pastedText.trim())) {
+                    return;
+                }
+
+                // Undo paste and upload
+                editor.executeEdits('paste-intercept', [{
+                    range: range,
+                    text: '',
+                    forceMoveMarkers: true
+                }]);
+
+                setStatus('Uploading to pastebin...', true);
+
+                try {
+                    const url = await uploadToPastebin(pastedText);
+                    insertTextAtCursor(url);
+                    setStatus(`✅ Uploaded: ${url}`);
+                    setTimeout(() => setStatus('Ready'), 3000);
+                } catch (error) {
+                    setStatus(`❌ Upload failed: ${error.message}`);
+                    insertTextAtCursor(pastedText);
+                    setTimeout(() => setStatus('Ready'), 3000);
+                }
+            });
+        }
+
+        // Setup drag and drop
+        function setupDragAndDrop() {
+            const container = document.getElementById('monacobro');
+            const overlay = document.createElement('div');
+            overlay.className = 'drop-zone-overlay';
+            overlay.innerHTML = `
+                <div class="drop-zone-content">
+                    <div class="icon">📁</div>
+                    <h2>Drop Files Here</h2>
+                    <p>Files will be uploaded and inserted as links</p>
+                </div>
+            `;
+            container.appendChild(overlay);
+
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                document.body.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }, false);
+            });
+
+            container.addEventListener('dragenter', () => {
+                dragCounter++;
+                overlay.classList.add('active');
+            });
+
+            container.addEventListener('dragleave', () => {
+                dragCounter--;
+                if (dragCounter === 0) overlay.classList.remove('active');
+            });
+
+            container.addEventListener('drop', async (e) => {
+                dragCounter = 0;
+                overlay.classList.remove('active');
+
+                const files = Array.from(e.dataTransfer.files);
+                if (files.length === 0) return;
+
+                setStatus(`Uploading ${files.length} file(s)...`, true);
+
+                try {
+                    const results = [];
+                    for (const file of files) {
+                        const content = file.type.startsWith('text/')
+                            ? await file.text()
+                            : await file.arrayBuffer().then(buf => new Blob([buf], { type: file.type }));
+
+                        const url = await uploadToPastebin(content);
+                        results.push(url);
+                    }
+
+                    insertTextAtCursor(results.join('\n') + '\n');
+                    setStatus(`✅ Uploaded ${files.length} file(s)`);
+                    setTimeout(() => setStatus('Ready'), 3000);
+                } catch (error) {
+                    setStatus(`❌ Upload failed: ${error.message}`);
+                    setTimeout(() => setStatus('Ready'), 3000);
+                }
+            });
+        }
+
+        // Initialize Monaco
+        require.config({
+            paths: { vs: 'https://unpkg.com/monaco-editor@0.44.0/min/vs' }
+        });
+
+        require(['vs/editor/editor.main'], function () {
+            editor = monaco.editor.create(document.getElementById('monacobro'), {
+                value: '# Monacobro with ContextArea\n\nPaste text, drop files, or add URLs!\n\nExample: https://example.com\n\nTry pasting a URL and see the token count appear next to it immediately. The details load within 500ms. Click the "🔍 Expand" code lens or use the quick fix (Ctrl/Cmd+.) to replace the URL with its content.',
+                language: 'markdown',
+                theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'vs-dark' : 'vs',
+                fontSize: 14,
+                lineNumbers: 'on',
+                wordWrap: 'on',
+                minimap: { enabled: false },
+                automaticLayout: true,
+                inlayHints: {
+                    enabled: 'on',
+                    fontSize: 12,
+                    fontFamily: 'Segoe UI, system-ui',
+                },
+                codeLens: true,
+                quickSuggestions: false,
+            });
+
+            // Register expand URL command
+            monaco.editor.addCommand({
+                id: 'expandUrl',
+                run: (accessor, url, range) => handleExpandUrl(url, range)
+            });
+
+            // Setup handlers
+            setupPasteHandler();
+            setupDragAndDrop();
+
+            // Update decorations on every content change (no debounce on detection)
+            editor.onDidChangeModelContent(() => {
+                updateUrlDecorations();
+            });
+
+            // Initial update
+            updateUrlDecorations();
+
+            // Theme switcher
+            const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+            mediaQuery.addEventListener('change', (e) => {
+                monaco.editor.setTheme(e.matches ? 'vs-dark' : 'vs');
+            });
+
+            // Cleanup on unload
+            window.addEventListener('beforeunload', () => {
+                disposables.forEach(d => d.dispose());
+            });
+
+            editor.focus();
+            setStatus('Ready - Paste text or drop files!');
+        });
+    </script>
+</body>
+
+</html>
