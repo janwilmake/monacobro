@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monacobro MCP</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: white;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin: 0 0 10px 0;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            opacity: 0.8;
+        }
+
+        #monacobro {
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            height: 600px;
+            position: relative;
+        }
+
+        .status-bar {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 8px;
+            padding: 10px 15px;
+            margin-top: 15px;
+            font-size: 0.85em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .mcp-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 15px;
+            padding: 12px 15px;
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(10px);
+            border-radius: 8px;
+        }
+
+        .mcp-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85em;
+            opacity: 0.85;
+        }
+
+        .mcp-legend-item .icon {
+            width: 18px;
+            height: 18px;
+            object-fit: contain;
+            flex-shrink: 0;
+        }
+
+        .mcp-legend-item .url {
+            opacity: 0.5;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>Monacobro MCP</h1>
+        <p>Type <strong>@</strong> to select an MCP server</p>
+    </div>
+
+    <div id="monacobro"></div>
+
+    <div class="status-bar">
+        <div id="status-message">Ready</div>
+        <div id="server-count"></div>
+    </div>
+
+    <div class="mcp-legend" id="mcp-legend"></div>
+
+    <script src="https://unpkg.com/monaco-editor@0.44.0/min/vs/loader.js"></script>
+    <script>
+        // ── MCP Server Registry ──────────────────────────────────────────
+        const MCP_SERVERS = [
+            {
+                name: 'filesystem',
+                url: 'https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem',
+                icon: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>')}`,
+                description: 'Read, write, and manage local files and directories',
+            },
+            {
+                name: 'github',
+                url: 'https://github.com/modelcontextprotocol/servers/tree/main/src/github',
+                icon: 'https://cdn.simpleicons.org/github/white',
+                description: 'Interact with GitHub repos, issues, PRs, and actions',
+            },
+            {
+                name: 'postgres',
+                url: 'https://github.com/modelcontextprotocol/servers/tree/main/src/postgres',
+                icon: 'https://cdn.simpleicons.org/postgresql/4169E1',
+                description: 'Query and manage PostgreSQL databases',
+            },
+            {
+                name: 'slack',
+                url: 'https://github.com/modelcontextprotocol/servers/tree/main/src/slack',
+                icon: 'https://cdn.simpleicons.org/slack',
+                description: 'Send messages and interact with Slack workspaces',
+            },
+            {
+                name: 'puppeteer',
+                url: 'https://github.com/modelcontextprotocol/servers/tree/main/src/puppeteer',
+                icon: 'https://cdn.simpleicons.org/puppeteer/00D8A2',
+                description: 'Browser automation, screenshots, and web scraping',
+            },
+            {
+                name: 'memory',
+                url: 'https://github.com/modelcontextprotocol/servers/tree/main/src/memory',
+                icon: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></svg>')}`,
+                description: 'Persistent knowledge graph for long-term memory',
+            },
+            {
+                name: 'brave-search',
+                url: 'https://github.com/modelcontextprotocol/servers/tree/main/src/brave-search',
+                icon: 'https://cdn.simpleicons.org/brave/FB542B',
+                description: 'Web and local search via Brave Search API',
+            },
+            {
+                name: 'fetch',
+                url: 'https://github.com/modelcontextprotocol/servers/tree/main/src/fetch',
+                icon: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>')}`,
+                description: 'Fetch and extract content from URLs',
+            },
+        ];
+
+        // ── State ────────────────────────────────────────────────────────
+        let editor = null;
+        let disposables = [];
+
+        // ── Status ───────────────────────────────────────────────────────
+        function setStatus(message) {
+            document.getElementById('status-message').textContent = message;
+        }
+
+        // ── Render legend ────────────────────────────────────────────────
+        function renderLegend() {
+            const legend = document.getElementById('mcp-legend');
+            legend.innerHTML = MCP_SERVERS.map(s =>
+                `<div class="mcp-legend-item">
+                    <img class="icon" src="${s.icon}" alt="${s.name}">
+                    <strong>${s.name}</strong>
+                    <span class="url">${s.url.replace('https://github.com/modelcontextprotocol/servers/tree/main/src/', '')}</span>
+                </div>`
+            ).join('');
+            document.getElementById('server-count').textContent = `${MCP_SERVERS.length} MCP servers`;
+        }
+
+        // ── Register @ completion provider ───────────────────────────────
+        function registerMcpCompletionProvider() {
+            disposables.push(
+                monaco.languages.registerCompletionItemProvider('markdown', {
+                    triggerCharacters: ['@'],
+                    provideCompletionItems(model, position) {
+                        // Find the @ trigger — look back from cursor to find @
+                        const lineContent = model.getLineContent(position.lineNumber);
+                        const textBeforeCursor = lineContent.substring(0, position.column - 1);
+                        const atIndex = textBeforeCursor.lastIndexOf('@');
+
+                        if (atIndex === -1) return { suggestions: [] };
+
+                        // The range to replace: from @ to current cursor
+                        const range = new monaco.Range(
+                            position.lineNumber, atIndex + 1,
+                            position.lineNumber, position.column
+                        );
+
+                        const suggestions = MCP_SERVERS.map((server, i) => ({
+                            label: {
+                                label: server.name,
+                                description: server.description,
+                            },
+                            kind: monaco.languages.CompletionItemKind.Module,
+                            insertText: `@${server.name}`,
+                            range: range,
+                            sortText: String(i).padStart(3, '0'),
+                            detail: server.description,
+                            documentation: {
+                                value: `<img src="${server.icon}" width="16" height="16">&nbsp; **${server.name}**\n\n${server.description}\n\n[${server.url}](${server.url})`,
+                                supportHtml: true,
+                                isTrusted: true,
+                            },
+                            filterText: `@${server.name}`,
+                        }));
+
+                        return { suggestions };
+                    }
+                })
+            );
+        }
+
+        // ── Register hover provider for @mentions ────────────────────────
+        function registerMcpHoverProvider() {
+            disposables.push(
+                monaco.languages.registerHoverProvider('markdown', {
+                    provideHover(model, position) {
+                        const line = model.getLineContent(position.lineNumber);
+                        const wordAtPos = model.getWordAtPosition(position);
+                        if (!wordAtPos) return null;
+
+                        // Check if preceded by @
+                        const charBefore = line[wordAtPos.startColumn - 2];
+                        if (charBefore !== '@') return null;
+
+                        const word = wordAtPos.word;
+                        const server = MCP_SERVERS.find(s => s.name === word);
+                        if (!server) return null;
+
+                        const range = new monaco.Range(
+                            position.lineNumber, wordAtPos.startColumn - 1,
+                            position.lineNumber, wordAtPos.endColumn
+                        );
+
+                        return {
+                            range,
+                            contents: [
+                                {
+                                    value: `<img src="${server.icon}" width="16" height="16">&nbsp; **${server.name}**\n\n${server.description}\n\n[${server.url}](${server.url})`,
+                                    supportHtml: true,
+                                    isTrusted: true,
+                                },
+                            ],
+                        };
+                    }
+                })
+            );
+        }
+
+        // ── Decoration for @mentions ─────────────────────────────────────
+        let mentionDecorations = [];
+
+        function updateMentionDecorations() {
+            if (!editor) return;
+
+            const model = editor.getModel();
+            const text = model.getValue();
+            const lines = text.split('\n');
+            const decorations = [];
+
+            const serverNames = MCP_SERVERS.map(s => s.name);
+            const mentionRegex = new RegExp(`@(${serverNames.join('|')})\\b`, 'g');
+
+            lines.forEach((line, lineIndex) => {
+                let match;
+                while ((match = mentionRegex.exec(line)) !== null) {
+                    decorations.push({
+                        range: new monaco.Range(
+                            lineIndex + 1, match.index + 1,
+                            lineIndex + 1, match.index + 1 + match[0].length
+                        ),
+                        options: {
+                            inlineClassName: 'mcp-mention',
+                            hoverMessage: { value: `MCP Server: **${match[1]}**` },
+                        },
+                    });
+                }
+            });
+
+            mentionDecorations = editor.deltaDecorations(mentionDecorations, decorations);
+        }
+
+        // ── Initialize Monaco ────────────────────────────────────────────
+        require.config({
+            paths: { vs: 'https://unpkg.com/monaco-editor@0.44.0/min/vs' }
+        });
+
+        require(['vs/editor/editor.main'], function () {
+            // Inject mention styling
+            const style = document.createElement('style');
+            style.textContent = `
+                .monaco-editor .mcp-mention {
+                    color: #7cb7ff !important;
+                    font-weight: 600;
+                    background: rgba(124, 183, 255, 0.1);
+                    border-radius: 3px;
+                    padding: 0 2px;
+                }
+            `;
+            document.head.appendChild(style);
+
+            // Patch suggest-widget rows to show real MCP icons.
+            // Strategy: restyle the codicon element in-place.
+            //   font-size:0 hides the ::before glyph,
+            //   background-image shows the real icon.
+            // No DOM add/remove — safe for Monaco's virtual-list recycler.
+            const patchSuggestIcons = () => {
+                const widget = document.querySelector('.suggest-widget');
+                if (!widget) return;
+                widget.querySelectorAll('.monaco-list-row').forEach(row => {
+                    const text = row.textContent || '';
+                    const server = MCP_SERVERS.find(s => text.includes(s.name));
+                    const codicon = row.querySelector('[class*="codicon-symbol"]');
+                    if (!codicon) return;
+
+                    if (server) {
+                        if (codicon.dataset.mcpServer === server.name) return;
+                        codicon.dataset.mcpServer = server.name;
+                        codicon.style.setProperty('font-size', '0', 'important');
+                        codicon.style.width = '16px';
+                        codicon.style.height = '16px';
+                        codicon.style.display = 'inline-block';
+                        codicon.style.backgroundImage = `url('${server.icon}')`;
+                        codicon.style.backgroundSize = 'contain';
+                        codicon.style.backgroundRepeat = 'no-repeat';
+                        codicon.style.backgroundPosition = 'center';
+                    } else if (codicon.dataset.mcpServer) {
+                        // Row recycled for a non-MCP item — reset
+                        delete codicon.dataset.mcpServer;
+                        codicon.removeAttribute('style');
+                    }
+                });
+            };
+
+            // Use MutationObserver + rAF so we patch after Monaco finishes rendering
+            const suggestObserver = new MutationObserver(() => {
+                requestAnimationFrame(patchSuggestIcons);
+            });
+            suggestObserver.observe(document.body, {
+                childList: true, subtree: true,
+                characterData: true, attributes: true,
+            });
+            disposables.push({ dispose: () => suggestObserver.disconnect() });
+
+            editor = monaco.editor.create(document.getElementById('monacobro'), {
+                value: [
+                    '# MCP Server References',
+                    '',
+                    'Type @ to mention an MCP server. Try it:',
+                    '',
+                    'Read my project files with @filesystem then search the web with @brave-search.',
+                    '',
+                    'Check the latest issues on @github and post a summary to @slack.',
+                    '',
+                    '',
+                ].join('\n'),
+                language: 'markdown',
+                theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'vs-dark' : 'vs',
+                fontSize: 14,
+                lineNumbers: 'on',
+                wordWrap: 'on',
+                minimap: { enabled: false },
+                automaticLayout: true,
+                quickSuggestions: false,
+                suggestOnTriggerCharacters: true,
+            });
+
+            // Register providers
+            registerMcpCompletionProvider();
+            registerMcpHoverProvider();
+
+            // Decorate existing @mentions
+            editor.onDidChangeModelContent(() => updateMentionDecorations());
+            updateMentionDecorations();
+
+            // Theme switcher
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+                monaco.editor.setTheme(e.matches ? 'vs-dark' : 'vs');
+            });
+
+            // Cleanup
+            window.addEventListener('beforeunload', () => {
+                disposables.forEach(d => d.dispose());
+            });
+
+            editor.focus();
+            renderLegend();
+            setStatus('Ready — type @ to mention an MCP server');
+
+            // Auto-expand the details/docs side panel on first suggest open.
+            // Monaco persists this state, so it only needs to fire once.
+            let detailsOpened = false;
+            const detailsObserver = new MutationObserver(() => {
+                if (detailsOpened) return;
+                const widget = document.querySelector('.suggest-widget');
+                if (widget && !widget.classList.contains('hidden')) {
+                    detailsOpened = true;
+                    setTimeout(() => {
+                        editor.trigger('api', 'toggleSuggestionDetails');
+                    }, 50);
+                }
+            });
+            detailsObserver.observe(document.body, { childList: true, subtree: true, attributes: true });
+            disposables.push({ dispose: () => detailsObserver.disconnect() });
+        });
+    </script>
+</body>
+
+</html>

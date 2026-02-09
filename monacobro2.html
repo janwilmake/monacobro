@@ -141,12 +141,26 @@
         const contextCache = new Map();
         const pendingContextFetches = new Map(); // Track in-flight requests
 
+        // Simple event emitter for Monaco provider change signals
+        function createEventEmitter() {
+            let listeners = [];
+            return {
+                event: (listener) => {
+                    listeners.push(listener);
+                    return { dispose: () => { listeners = listeners.filter(l => l !== listener); } };
+                },
+                fire: (data) => { listeners.forEach(l => l(data)); }
+            };
+        }
+
         // State
         let editor = null;
         let urlDecorations = [];
         let dragCounter = 0;
         let disposables = [];
         let currentUrlsInText = new Map();
+        const codeLensChange = createEventEmitter();
+        const inlayHintsChange = createEventEmitter();
 
         // Status management
         function setStatus(message, isLoading = false) {
@@ -237,8 +251,9 @@
             urlDecorations = editor.deltaDecorations(urlDecorations, decorations);
             currentUrlsInText = urlsInText;
 
-            // Re-register providers immediately with current data
-            registerProviders();
+            // Signal providers to refresh (they read currentUrlsInText live)
+            codeLensChange.fire();
+            inlayHintsChange.fire();
 
             // Fetch context data for new URLs (debounced)
             debouncedFetchContexts(urlsInText);
@@ -264,18 +279,15 @@
 
                 if (fetchPromises.length > 0) {
                     await Promise.all(fetchPromises);
-                    // Re-register providers with fresh context data
-                    registerProviders();
+                    // Signal providers to refresh with new context data
+                    codeLensChange.fire();
+                    inlayHintsChange.fire();
                 }
             }, CONFIG.contextDebounce);
         }
 
-        // Register Monaco providers
+        // Register Monaco providers (called once at init)
         function registerProviders() {
-            // Clear previous disposables
-            disposables.forEach(d => d.dispose());
-            disposables = [];
-
             // Hover provider
             disposables.push(
                 monaco.languages.registerHoverProvider('markdown', {
@@ -315,6 +327,7 @@
             // Inlay hints provider
             disposables.push(
                 monaco.languages.registerInlayHintsProvider('markdown', {
+                    onDidChangeInlayHints: inlayHintsChange.event,
                     provideInlayHints(model, range, token) {
                         const hints = [];
 
@@ -384,6 +397,7 @@
             // Code lens provider
             disposables.push(
                 monaco.languages.registerCodeLensProvider('markdown', {
+                    onDidChange: codeLensChange.event,
                     provideCodeLenses: (model) => {
                         const lenses = [];
 
@@ -472,6 +486,7 @@
         // Setup paste handler
         function setupPasteHandler() {
             let shiftPressed = false;
+            let scrollTopBeforePaste = 0;
 
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Shift') shiftPressed = true;
@@ -480,6 +495,11 @@
             document.addEventListener('keyup', (e) => {
                 if (e.key === 'Shift') shiftPressed = false;
             });
+
+            // Capture scroll position before Monaco processes the paste
+            editor.getDomNode().addEventListener('paste', () => {
+                scrollTopBeforePaste = editor.getScrollTop();
+            }, true);
 
             editor.onDidPaste(async (e) => {
                 if (shiftPressed) return;
@@ -493,18 +513,20 @@
                     return;
                 }
 
-                // Undo paste and upload
+                // Undo paste and upload, restore scroll position
                 editor.executeEdits('paste-intercept', [{
                     range: range,
                     text: '',
                     forceMoveMarkers: true
                 }]);
+                editor.setScrollTop(scrollTopBeforePaste);
 
                 setStatus('Uploading to pastebin...', true);
 
                 try {
                     const url = await uploadToPastebin(pastedText);
                     insertTextAtCursor(url);
+                    editor.setScrollTop(scrollTopBeforePaste);
                     setStatus(`✅ Uploaded: ${url}`);
                     setTimeout(() => setStatus('Ready'), 3000);
                 } catch (error) {
@@ -609,6 +631,9 @@
             // Setup handlers
             setupPasteHandler();
             setupDragAndDrop();
+
+            // Register providers once (they use onDidChange events for updates)
+            registerProviders();
 
             // Update decorations on every content change (no debounce on detection)
             editor.onDidChangeModelContent(() => {
